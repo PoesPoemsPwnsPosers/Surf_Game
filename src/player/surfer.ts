@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { CONFIG, type BoardTuning } from '../config';
 import type { Input } from '../core/input';
+import { lipTopAt } from '../ocean/lip';
 import { WaveSystem, clamp, smoothstep, type Wave, type WaveSample } from '../ocean/waves';
 import { SurferModel } from './surferModel';
 
@@ -30,6 +31,8 @@ export type SurferEvent =
   | { type: 'trickEnd'; name: string; key: WaveTrick; time: number }
   /** Came out of the barrel after `time` seconds inside. */
   | { type: 'barrel'; time: number }
+  /** Came off the top of the curling lip after riding it for `time` seconds. */
+  | { type: 'lipRide'; time: number }
   | { type: 'kick' }
   | { type: 'spray'; power: number }
   | { type: 'board'; name: string }
@@ -142,6 +145,9 @@ export class Surfer {
   private trickCooldown = 0;
   private trickKey = 'KeyQ';
 
+  /** True while riding on top of the curling lip. */
+  onLip = false;
+  lipTime = 0;
   /** True while tucked under the curling lip next to the whitewater. */
   inBarrel = false;
   barrelTime = 0;
@@ -366,6 +372,29 @@ export class Surfer {
     this.barrelTime = 0;
   }
 
+  private endLipRide(): void {
+    if (!this.onLip) return;
+    this.onLip = false;
+    if (this.lipTime >= CONFIG.points.lipRideMinTime) this.events.push({ type: 'lipRide', time: this.lipTime });
+    this.lipTime = 0;
+  }
+
+  /** Height of whatever the board is riding on: the lip when it is up there, otherwise the water. */
+  private surfaceHeight(x: number, z: number): number {
+    const h = this.waves.height(x, z);
+    return this.onLip ? Math.max(h, lipTopAt(this.waves, x, z)) : h;
+  }
+
+  private surfaceGradient(x: number, z: number, out: { x: number; z: number }): void {
+    if (!this.onLip) {
+      this.waves.gradient(x, z, out);
+      return;
+    }
+    const e = 0.35;
+    out.x = (this.surfaceHeight(x + e, z) - this.surfaceHeight(x - e, z)) / (2 * e);
+    out.z = (this.surfaceHeight(x, z + e) - this.surfaceHeight(x, z - e)) / (2 * e);
+  }
+
   private addKick(amount: number): void {
     this.kickCharges = Math.min(CONFIG.air.kickMaxCharges, this.kickCharges + amount);
   }
@@ -386,7 +415,7 @@ export class Surfer {
     const BR = CONFIG.barrel;
     let tubed = false;
     this.underLip = false;
-    if (ws && this.carry > 0.3 && ws.wave.brokenHalfWidth >= 0 && ws.localAmp > BR.minHeight) {
+    if (!this.onLip && ws && this.carry > 0.3 && ws.wave.brokenHalfWidth >= 0 && ws.localAmp > BR.minHeight) {
       const fromFoam = Math.abs(this.pos.x - ws.wave.peakX) - ws.wave.brokenHalfWidth;
       const up = ws.ahead / ws.wave.faceWidth;
       // The lip is overhead from the crest out to where it comes down in front. It thins toward the shoulder.
@@ -488,7 +517,7 @@ export class Surfer {
     const fx = this.forwardX;
     const fz = this.forwardZ;
 
-    this.waves.gradient(this.pos.x, this.pos.z, this.grad);
+    this.surfaceGradient(this.pos.x, this.pos.z, this.grad);
     const gx = this.grad.x;
     const gz = this.grad.z;
     const slopeAlong = gx * fx + gz * fz;
@@ -529,10 +558,30 @@ export class Surfer {
     this.pos.z += (this.speed * fz + T.speed * this.carry) * dt;
 
     // Follow the surface, and notice when it drops away faster than gravity.
-    const surfaceY = this.waves.height(this.pos.x, this.pos.z);
+    const waveY = this.waves.height(this.pos.x, this.pos.z);
+    // The curling lip is solid from above: coming at it from the crest, the board rides up onto it.
+    const lipY = lipTopAt(this.waves, this.pos.x, this.pos.z);
+    const lipHere = lipY > waveY + 0.15;
+    if (!this.onLip && lipHere && this.pos.y >= lipY - BR.lipStepUp) {
+      this.onLip = true;
+      this.lipTime = 0;
+      this.inBarrel = false;
+      this.barrelTime = 0;
+    } else if (this.onLip && !lipHere) {
+      // Ran off the end of the lip. If there is a drop, it is a launch.
+      this.endLipRide();
+      if (this.pos.y - waveY > 0.6) {
+        if (this.trick) this.endTrick();
+        this.launch(Math.max(this.vy, 0), false, ws);
+        return;
+      }
+    }
+    if (this.onLip) this.lipTime += dt;
+    const surfaceY = this.onLip ? lipY : waveY;
     const surfaceVY = (surfaceY - this.pos.y) / dt;
     const offLip =
       !this.trick &&
+      !this.onLip &&
       this.vy > A.minLaunchSpeed &&
       this.vy - A.gravity * A.lipStick * dt > surfaceVY + 0.1 &&
       this.stateTime > 0.15;
@@ -552,6 +601,7 @@ export class Surfer {
       vy = Math.min(vy, B.launchPower);
       if (this.trick) this.endTrick();
       this.endBarrel();
+      this.endLipRide();
       this.launch(vy, offLip, ws);
       return;
     }
@@ -561,7 +611,7 @@ export class Surfer {
     // Sitting in the whitewater at the crest for too long ends badly. A floater is the exception.
     const inFoam =
       ws && ws.foam > 0.6 && ws.localAmp > 0.8 && ws.ahead > -2.5 && ws.ahead < ws.wave.faceWidth * CONFIG.surf.foamZone;
-    if (inFoam && this.trick !== 'floater') {
+    if (inFoam && this.trick !== 'floater' && !this.onLip) {
       this.foamTimer += dt;
       if (this.foamTimer > B.foamGrace) {
         this.wipeout('foam');
@@ -721,9 +771,15 @@ export class Surfer {
     }
     if (grab) this.grabTime += dt;
 
-    const surfaceY = this.waves.height(this.pos.x, this.pos.z);
+    // Coming down onto the top of a curling lip lands on it. From any other direction it is just spray.
+    const waveY = this.waves.height(this.pos.x, this.pos.z);
+    const lipY = lipTopAt(this.waves, this.pos.x, this.pos.z);
+    const ontoLip = lipY > waveY + 0.15 && this.vy < 0 && this.pos.y <= lipY && this.pos.y - this.vy * dt >= lipY - 0.25;
+    const surfaceY = ontoLip ? lipY : waveY;
     if (this.pos.y <= surfaceY && this.vy < 0) {
       this.pos.y = surfaceY;
+      this.onLip = ontoLip;
+      this.lipTime = 0;
       const spinErr = Math.abs(offNearest(this.spin, Math.PI));
       const flipErr = Math.abs(offNearest(this.flip, TAU));
       if (spinErr > B.spinLandTolerance || flipErr > B.flipLandTolerance) {
@@ -811,6 +867,8 @@ export class Surfer {
     // A wipeout throws away whatever was in progress.
     this.trick = null;
     this.model.boardYaw = 0;
+    this.onLip = false;
+    this.lipTime = 0;
     this.inBarrel = false;
     this.barrelTime = 0;
     this.setState('wipeout');
@@ -855,6 +913,7 @@ export class Surfer {
   private endRide(): void {
     if (this.trick) this.endTrick();
     this.endBarrel();
+    this.endLipRide();
     this.paddleVX = this.speed * this.forwardX;
     this.paddleVZ = this.speed * this.forwardZ;
     this.carry = 0;
@@ -878,7 +937,7 @@ export class Surfer {
   updateVisual(dt: number): void {
     const grounded = this.state === 'surf' || this.state === 'paddle';
     if (grounded) {
-      this.waves.gradient(this.pos.x, this.pos.z, this.grad);
+      this.surfaceGradient(this.pos.x, this.pos.z, this.grad);
       this.tmpN.set(-this.grad.x, 1, -this.grad.z).normalize();
     } else {
       this.tmpN.set(0, 1, 0);

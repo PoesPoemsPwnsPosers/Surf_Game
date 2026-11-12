@@ -415,6 +415,12 @@ export const CONFIG = {
     /** How far round the lip curls at its thickest, in half turns (1 is a half pipe roof, more hangs down in front). */
     lipWrap: 1.22,
     lipOpacity: 0.86,
+    /** How rounded the lip's root is where it leaves the crest (1 is a plain arch, more is a gentler ramp). */
+    lipRootEase: 1.5,
+    /** The lip can be ridden on top where it is at least this thick (0 to 1). */
+    lipSolidSize: 0.35,
+    /** The board steps up onto the lip from the crest if the lip is no more than this far above it (metres). */
+    lipStepUp: 0.6,
   },
 
   /** Cool points. Every number the scoring uses. */
@@ -452,6 +458,9 @@ export const CONFIG = {
     floaterPerSecond: 15,
     /** Barrel riding, per second, paid on the way out. A long barrel is the big one. */
     barrelPerSecond: 40,
+    /** Riding on top of the curling lip, per second, paid when the board comes off it. */
+    lipRidePerSecond: 30,
+    lipRideMinTime: 0.5,
     /** Doing the same wave trick again in one ride is worth this much of the last time, down to the floor. */
     repeatFalloff: 0.7,
     repeatFloor: 0.25,

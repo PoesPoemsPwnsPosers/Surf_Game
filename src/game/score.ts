@@ -70,6 +70,9 @@ export class Score {
       case 'barrel':
         this.add(`Barrel ${e.time.toFixed(1)}s`, P.barrelPerSecond * e.time);
         break;
+      case 'lipRide':
+        this.add(`Lip ride ${e.time.toFixed(1)}s`, P.lipRidePerSecond * e.time);
+        break;
       case 'land': {
         if (e.hopped) this.add('Wave hop', P.waveHop);
         const flips = Math.round(Math.abs(e.flip) / (Math.PI * 2));

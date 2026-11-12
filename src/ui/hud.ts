@@ -32,6 +32,7 @@ export class Hud {
   private shownTotal = 0;
   private lastTotalText = '';
   private lastPot = -1;
+  private lastTag = '';
   private lastMult = 0;
   private pips: HTMLElement[] = [];
   private bannerTimer = 0;
@@ -104,7 +105,12 @@ export class Hud {
       this.lastPot = pot;
       this.lastMult = mult;
     }
-    this.barrelTag.classList.toggle('on', surfer.inBarrel && surfer.barrelTime > 0.25);
+    const tag = surfer.onLip && surfer.lipTime > 0.25 ? 'ON THE LIP' : surfer.inBarrel && surfer.barrelTime > 0.25 ? 'IN THE BARREL' : '';
+    if (tag !== this.lastTag) {
+      if (tag) this.barrelTag.textContent = tag;
+      this.barrelTag.classList.toggle('on', tag !== '');
+      this.lastTag = tag;
+    }
 
     // Set timer: counts down to the next set reaching the lineup.
     const s = waves.setStatus();

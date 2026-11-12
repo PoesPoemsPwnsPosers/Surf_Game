@@ -248,6 +248,7 @@ class Game {
       case 'trick':
       case 'trickEnd':
       case 'barrel':
+      case 'lipRide':
         break;
       case 'spray':
         // A fan of spray thrown out to sea off the top of the wave.
