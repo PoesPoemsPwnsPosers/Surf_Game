@@ -113,6 +113,8 @@ export class Surfer {
   private grabTime = 0;
   private kicksUsed = 0;
   private airYaw = 0;
+  private landAssist = 0;
+  private landSide = 1;
   /** Banked air kicks. Whole numbers are usable; the fraction is progress to the next. */
   kickCharges = CONFIG.air.kickStartCharges;
 
@@ -367,7 +369,9 @@ export class Surfer {
     const trick = this.trick;
     if (trick) this.trickTime += dt;
     const tt = this.trickTime;
-    const side = trick ? this.trickSide : this.forwardX > 0 ? 1 : -1;
+    this.landAssist = Math.max(0, this.landAssist - dt);
+    const settling = this.landAssist > 0 && !trick;
+    const side = trick ? this.trickSide : settling ? this.landSide : this.forwardX > 0 ? 1 : -1;
     const trimHeading = side * (Math.PI / 2);
 
     // ---- Steering. A turns left, D turns right, as seen from behind the board.
@@ -427,12 +431,13 @@ export class Surfer {
     if (trick && (holdOver || this.carry < 0.15)) this.endTrick();
 
     const handsOff = steer === 0 && trick !== 'cutback' && trick !== 'snap';
-    if (handsOff && near > 0.1 && Math.abs(this.forwardX) > 0.15) {
+    if (handsOff && near > 0.1 && (settling || Math.abs(this.forwardX) > 0.15)) {
       // Hands off: settle into a trim line along the wave.
       // Aim a little up or down the face to drift back to the sweet spot.
       const off = ws ? clamp((ws.ahead / ws.wave.faceWidth - trimLine) * 0.7, -0.45, 0.45) : 0;
       const along = side * (Math.PI / 2 + off * this.carry);
-      turnTarget = clamp(shortestAngle(this.heading, along) * 3, -S.autoTrim, S.autoTrim) * near;
+      const rate = S.autoTrim * (settling ? A.landCarveBoost : 1);
+      turnTarget = clamp(shortestAngle(this.heading, along) * 3, -rate, rate) * near;
     }
     const response = trick === 'cutback' || trick === 'snap' ? 22 : S.turnResponse;
     this.turnVel += (turnTarget - this.turnVel) * (1 - Math.exp(-dt * response));
@@ -670,20 +675,22 @@ export class Surfer {
         this.wipeout('landing');
         return;
       }
-      // Clean landing: point back down the face and keep the speed.
+      // Clean landing: carry the flight's momentum onto the water. No snapping round.
       const ws = this.waves.waveAt(this.pos.x, this.pos.z, this.sample);
-      const onWave = !!ws && this.carryAt(ws) > 0.3;
+      const landCarry = ws ? this.carryAt(ws) : 0;
+      const onWave = landCarry > 0.3;
       const hopped = onWave && this.launchWave !== null && ws!.wave !== this.launchWave;
-      let vx = this.airVX;
-      if (Math.abs(vx) < 2.5) {
-        // Came in nearly straight: pick a side so the board trims instead of running out onto the flat.
-        const away = ws ? Math.sign(this.pos.x - ws.wave.peakX) || 1 : 1;
-        vx = (Math.abs(vx) > 0.4 ? Math.sign(vx) : away) * 2.5;
-      }
-      const vz = Math.max(Math.abs(this.airVZ) * (this.seaward ? 0.35 : 1), Math.abs(vx) * 0.3, 2);
-      this.heading = Math.atan2(vx, vz);
-      const flown = this.seaward ? this.launchSpeed : Math.max(Math.hypot(this.airVX, this.airVZ), this.launchSpeed);
-      this.speed = flown * A.landSpeedKeep;
+      // Speed relative to the water the board lands on (a wave face is itself moving toward the beach).
+      const wx = this.airVX;
+      let wz = this.airVZ + this.airFrame - T.speed * landCarry;
+      // Coming down against an oncoming face, the face soaks up part of the speed into it.
+      if (onWave && wz < 0) wz *= A.landFaceAbsorb;
+      const landed = Math.hypot(wx, wz);
+      if (landed > 0.5) this.heading = Math.atan2(wx, wz);
+      this.speed = landed * A.landSpeedKeep;
+      // For a moment the hands-off autopilot carves harder, to bend the landing into a trim line.
+      this.landAssist = A.landCarveTime;
+      this.landSide = Math.abs(wx) > 1.5 ? Math.sign(wx) : ws ? Math.sign(this.pos.x - ws.wave.peakX) || 1 : 1;
       const grabbed = this.grabTime >= A.grabMinTime;
       const tricked = Math.abs(this.spin) > Math.PI * 0.75 || Math.abs(this.flip) > Math.PI * 1.5 || grabbed;
       if (tricked) this.addKick(A.kickPerAirTrick);
@@ -830,7 +837,9 @@ export class Surfer {
       }
       yaw = this.airYaw + this.spin;
     } else {
-      this.airYaw = this.heading;
+      // On the water the board follows its heading, eased so a landing never snaps.
+      this.airYaw += shortestAngle(this.airYaw, this.heading) * (1 - Math.exp(-dt * 20));
+      yaw = this.airYaw;
     }
 
     this.qAlign.setFromUnitVectors(this.up, this.normal);

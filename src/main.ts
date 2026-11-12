@@ -4,6 +4,7 @@ import { Input } from './core/input';
 import type { LevelDefinition, LevelEnvironment } from './core/level';
 import { FollowCamera } from './camera/followCamera';
 import { Spray } from './fx/particles';
+import { LightTrail } from './fx/trail';
 import { loadLevel, type LevelId } from './levels';
 import { OceanMesh } from './ocean/oceanMesh';
 import { WaveSystem } from './ocean/waves';
@@ -22,6 +23,9 @@ class Game {
   private ocean!: OceanMesh;
   private surfer!: Surfer;
   private spray = new Spray(600);
+  private trail = new LightTrail();
+  private tailL = new THREE.Vector3();
+  private tailR = new THREE.Vector3();
   private env!: LevelEnvironment;
   private level!: LevelDefinition;
   private mode: Mode = 'loading';
@@ -87,7 +91,7 @@ class Game {
     this.scene.add(this.ocean.farPlane, this.ocean.mesh, this.spray.mesh);
     this.env = this.level.buildEnvironment(this.scene, this.waves);
     this.surfer = new Surfer(this.waves);
-    this.scene.add(this.surfer.model.root, this.shadow, this.landRing);
+    this.scene.add(this.surfer.model.root, this.shadow, this.landRing, this.trail.group);
     this.shadow.visible = false;
     this.landRing.visible = false;
     this.surfer.events.length = 0;
@@ -162,6 +166,7 @@ class Game {
     }
     this.updateMarkers();
     this.cam.update(dt, this.surfer, this.input, this.waves);
+    this.updateTrail(playing ? dt : 0);
     if (this.mode !== 'loading') this.hud.update(dt, this.surfer, this.waves);
     this.renderer.render(this.scene, this.cam.camera);
     this.input.endFrame();
@@ -172,6 +177,22 @@ class Game {
     for (let i = 0; i < CONFIG.boards.length; i++) {
       if (this.input.wasPressed(`Digit${i + 1}`)) this.surfer.setBoard(i);
     }
+  }
+
+  private surfaceAt = (x: number, z: number): number => this.waves.height(x, z);
+
+  /** Tail lights: two glowing streaks off the back of the board that fade like a long exposure. */
+  private updateTrail(dt: number): void {
+    const s = this.surfer;
+    const b = s.board;
+    const pivot = s.model.boardPivot;
+    pivot.updateWorldMatrix(true, false);
+    this.tailL.set(0.2 * b.scale, 0.1, -1.05 * b.scale).applyMatrix4(pivot.matrixWorld);
+    this.tailR.set(-0.2 * b.scale, 0.1, -1.05 * b.scale).applyMatrix4(pivot.matrixWorld);
+    const T = CONFIG.trail;
+    const riding = s.state === 'surf' || s.state === 'air';
+    const power = Math.min(1, Math.max(0, (s.displaySpeed - T.minSpeed) / Math.max(1, b.pumpMaxSpeed - T.minSpeed)));
+    this.trail.update(dt, riding && power > 0, this.tailL, this.tailR, 0.35 + 0.65 * power, this.cam.camera.position, this.surfaceAt);
   }
 
   /** A shadow under the surfer and a ring where the flight will come down. */
@@ -299,12 +320,17 @@ class Game {
       this.surfer.step(step, this.input, this.cam.yaw);
       this.input.consumePresses();
       this.cam.update(step, this.surfer, this.input, this.waves);
+      if (++this.simTick % 2 === 0) {
+        this.surfer.updateVisual(step * 2);
+        this.updateTrail(step * 2);
+      }
       for (const e of this.surfer.events) this.onSurferEvent(e);
       this.log.push(...this.surfer.events);
       this.surfer.events.length = 0;
     }
   }
   readonly log: SurferEvent[] = [];
+  private simTick = 0;
   get debug() {
     return { surfer: this.surfer, waves: this.waves, input: this.input, hud: this.hud, cam: this.cam };
   }

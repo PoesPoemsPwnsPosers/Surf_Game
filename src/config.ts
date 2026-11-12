@@ -259,8 +259,13 @@ export const CONFIG = {
     settleRate: 3.2,
     /** Pull that brings the surfer back over the wave face while airborne. */
     waveMagnet: 1.6,
-    /** Fraction of speed kept on landing. */
-    landSpeedKeep: 0.92,
+    /** Fraction of speed kept on landing. The board keeps the direction it was flying in. */
+    landSpeedKeep: 0.94,
+    /** Landing against an oncoming wave face keeps only this fraction of the speed into the face. */
+    landFaceAbsorb: 0.3,
+    /** For this long after landing, the hands-off autopilot carves this many times harder to settle into trim. */
+    landCarveTime: 0.9,
+    landCarveBoost: 3.2,
 
     // --- Flying out the back, toward the ocean ---
     /**
@@ -364,6 +369,23 @@ export const CONFIG = {
       /** Speed gained dropping back down. */
       speedGain: 2,
     },
+  },
+
+  /** The glowing light trail behind the board, like tail lights in a long-exposure photo. */
+  trail: {
+    /** Seconds a point of the trail takes to fade out. */
+    life: 1.1,
+    /** Width of each streak (metres). */
+    width: 0.34,
+    /** The trail starts to show above this speed and is at full strength at the board's pumped top speed. */
+    minSpeed: 7,
+    /** Colour at the board and at the fading end. */
+    color: 0xff1228,
+    fadeColor: 0xff4a3a,
+    /** Brightness, 0 to 1. */
+    strength: 1,
+    /** Extra additive glow on top, 0 to 1. */
+    glow: 0.4,
   },
 
   wipeout: {
