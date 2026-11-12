@@ -25,7 +25,11 @@ export type SurferEvent =
       onWave: boolean;
       kicks: number;
     }
-  | { type: 'trick'; name: string }
+  | { type: 'trick'; name: string; key: WaveTrick }
+  /** A counted wave trick finished. `time` is how long it was held. */
+  | { type: 'trickEnd'; name: string; key: WaveTrick; time: number }
+  /** Came out of the barrel after `time` seconds inside. */
+  | { type: 'barrel'; time: number }
   | { type: 'kick' }
   | { type: 'spray'; power: number }
   | { type: 'board'; name: string }
@@ -131,6 +135,10 @@ export class Surfer {
   private trickCounted = false;
   private trickCooldown = 0;
   private trickKey = 'KeyQ';
+
+  /** True while tucked under the curling lip next to the whitewater. */
+  inBarrel = false;
+  barrelTime = 0;
 
   private foamTimer = 0;
   private tumble = 0;
@@ -330,16 +338,26 @@ export class Surfer {
     if (this.trickCounted || !this.trick) return;
     this.trickCounted = true;
     this.addKick(CONFIG.air.kickPerWaveTrick);
-    this.events.push({ type: 'trick', name: TRICK_NAMES[this.trick] });
+    this.events.push({ type: 'trick', name: TRICK_NAMES[this.trick], key: this.trick });
   }
 
   private endTrick(): void {
     const K = CONFIG.tricks;
     if (this.trick === 'floater' && this.trickCounted) this.speed += K.floater.speedGain;
+    if (this.trick && this.trickCounted) {
+      this.events.push({ type: 'trickEnd', name: TRICK_NAMES[this.trick], key: this.trick, time: this.trickTime });
+    }
     this.trick = null;
     this.trickCooldown = K.cooldown;
     this.model.boardYaw = 0;
     if (this.state === 'surf') this.model.setPose('stand');
+  }
+
+  private endBarrel(): void {
+    if (!this.inBarrel) return;
+    this.inBarrel = false;
+    if (this.barrelTime >= CONFIG.barrel.minTime) this.events.push({ type: 'barrel', time: this.barrelTime });
+    this.barrelTime = 0;
   }
 
   private addKick(amount: number): void {
@@ -357,6 +375,21 @@ export class Surfer {
     const ws = this.waves.waveAt(this.pos.x, this.pos.z, this.sample);
     this.carry = ws ? this.carryAt(ws) : 0;
     const near = ws ? this.nearWave(ws) : 0;
+
+    // ---- Barrel: tucked under the curling lip, just ahead of where the wave is breaking.
+    const BR = CONFIG.barrel;
+    let tubed = false;
+    if (ws && this.carry > 0.5 && ws.wave.brokenHalfWidth >= 0 && ws.localAmp > BR.minHeight) {
+      const fromFoam = Math.abs(this.pos.x - ws.wave.peakX) - ws.wave.brokenHalfWidth;
+      const up = ws.ahead / ws.wave.faceWidth;
+      tubed = fromFoam > BR.inside && fromFoam < BR.width && up > BR.minAhead && up < BR.maxAhead;
+    }
+    if (tubed) {
+      this.inBarrel = true;
+      this.barrelTime += dt;
+    } else if (this.inBarrel) {
+      this.endBarrel();
+    }
 
     // ---- Wave tricks: Q cutback, E snap, W+Q hang ten, S+Q tail slide, W+E floater.
     this.trickCooldown = Math.max(0, this.trickCooldown - dt);
@@ -428,7 +461,8 @@ export class Surfer {
       }
       if (tt > F.maxTime || !input.isDown(this.trickKey)) holdOver = true;
     }
-    if (trick && (holdOver || this.carry < 0.15)) this.endTrick();
+    // A cutback swings out onto the flat in front of the wave, so it only ends early if the wave is lost.
+    if (trick && (holdOver || (trick === 'cutback' ? near < 0.1 : this.carry < 0.15))) this.endTrick();
 
     const handsOff = steer === 0 && trick !== 'cutback' && trick !== 'snap';
     if (handsOff && near > 0.1 && (settling || Math.abs(this.forwardX) > 0.15)) {
@@ -497,6 +531,7 @@ export class Surfer {
       }
       vy = Math.min(vy, B.launchPower);
       if (this.trick) this.endTrick();
+      this.endBarrel();
       this.launch(vy, offLip, ws);
       return;
     }
@@ -505,7 +540,7 @@ export class Surfer {
 
     // Sitting in the whitewater at the crest for too long ends badly. A floater is the exception.
     const inFoam =
-      ws && ws.foam > 0.6 && ws.localAmp > 0.8 && ws.ahead > -2.5 && ws.ahead < ws.wave.faceWidth * 0.8;
+      ws && ws.foam > 0.6 && ws.localAmp > 0.8 && ws.ahead > -2.5 && ws.ahead < ws.wave.faceWidth * CONFIG.surf.foamZone;
     if (inFoam && this.trick !== 'floater') {
       this.foamTimer += dt;
       if (this.foamTimer > B.foamGrace) {
@@ -752,7 +787,11 @@ export class Surfer {
   // ------------------------------------------------------- wipeout and reset
 
   private wipeout(reason: 'landing' | 'foam'): void {
-    if (this.trick) this.endTrick();
+    // A wipeout throws away whatever was in progress.
+    this.trick = null;
+    this.model.boardYaw = 0;
+    this.inBarrel = false;
+    this.barrelTime = 0;
     this.setState('wipeout');
     this.model.setPose('tumble');
     this.tumble = 0;
@@ -794,6 +833,7 @@ export class Surfer {
 
   private endRide(): void {
     if (this.trick) this.endTrick();
+    this.endBarrel();
     this.paddleVX = this.speed * this.forwardX;
     this.paddleVZ = this.speed * this.forwardZ;
     this.carry = 0;
@@ -861,7 +901,7 @@ export class Surfer {
 
     const paddling = this.state === 'paddle' ? clamp(this.speed / CONFIG.paddle.speed, 0, 1.4) : 0;
     const crouch = clamp(
-      (this.pumping && this.state === 'surf' ? 0.6 : 0) + this.landSquash + Math.abs(this.lean) * 0.3,
+      (this.pumping && this.state === 'surf' ? 0.6 : 0) + (this.inBarrel ? 0.8 : 0) + this.landSquash + Math.abs(this.lean) * 0.3,
       0,
       1,
     );

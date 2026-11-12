@@ -12,7 +12,7 @@
 
 No third-party assets are used yet.
 
-Everything on screen in milestone 1 (surfer, board, ocean, palms, buildings, buoys, clouds) is
+Everything on screen so far (surfer, board, ocean, palms, buildings, buoys, clouds) is
 built from simple shapes in code written for this project.
 
 When asset packs are added (planned for milestones 3 and 5), each one will be listed here with

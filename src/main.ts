@@ -4,8 +4,10 @@ import { Input } from './core/input';
 import type { LevelDefinition, LevelEnvironment } from './core/level';
 import { FollowCamera } from './camera/followCamera';
 import { Spray } from './fx/particles';
+import { Score } from './game/score';
 import { LightTrail } from './fx/trail';
 import { loadLevel, type LevelId } from './levels';
+import { LipMesh } from './ocean/lipMesh';
 import { OceanMesh } from './ocean/oceanMesh';
 import { WaveSystem } from './ocean/waves';
 import { Surfer, type SurferEvent } from './player/surfer';
@@ -21,9 +23,11 @@ class Game {
   private hud!: Hud;
   private waves!: WaveSystem;
   private ocean!: OceanMesh;
+  private lip!: LipMesh;
   private surfer!: Surfer;
   private spray = new Spray(600);
   private trail = new LightTrail();
+  readonly score = new Score();
   private tailL = new THREE.Vector3();
   private tailR = new THREE.Vector3();
   private env!: LevelEnvironment;
@@ -88,7 +92,8 @@ class Game {
       cellZ: 1.55,
       look: this.level.ocean,
     });
-    this.scene.add(this.ocean.farPlane, this.ocean.mesh, this.spray.mesh);
+    this.lip = new LipMesh(this.waves, this.level.ocean);
+    this.scene.add(this.ocean.farPlane, this.ocean.mesh, this.lip.mesh, this.spray.mesh);
     this.env = this.level.buildEnvironment(this.scene, this.waves);
     this.surfer = new Surfer(this.waves);
     this.scene.add(this.surfer.model.root, this.shadow, this.landRing, this.trail.group);
@@ -102,6 +107,7 @@ class Game {
 
     this.waves.update(0);
     this.ocean.update();
+    this.lip.update();
     this.last = performance.now();
     requestAnimationFrame(this.frame);
   }
@@ -146,6 +152,7 @@ class Game {
       this.waves.update(step);
       this.debugKeys();
       this.surfer.step(step, this.input, this.cam.yaw);
+      this.score.update(step, this.surfer);
       this.input.consumePresses();
       this.acc -= step;
       n++;
@@ -158,6 +165,7 @@ class Game {
   private present(dt: number): void {
     const playing = this.mode === 'playing';
     this.ocean.update();
+    this.lip.update();
     this.surfer.updateVisual(playing ? dt : 0);
     if (playing) {
       this.emitSpray(dt);
@@ -167,7 +175,7 @@ class Game {
     this.updateMarkers();
     this.cam.update(dt, this.surfer, this.input, this.waves);
     this.updateTrail(playing ? dt : 0);
-    if (this.mode !== 'loading') this.hud.update(dt, this.surfer, this.waves);
+    if (this.mode !== 'loading') this.hud.update(dt, this.surfer, this.waves, this.score);
     this.renderer.render(this.scene, this.cam.camera);
     this.input.endFrame();
   }
@@ -218,6 +226,9 @@ class Game {
 
   private onSurferEvent(e: SurferEvent): void {
     const p = this.surfer.pos;
+    this.score.onEvent(e);
+    for (const pop of this.score.popups) this.hud.popup(pop);
+    this.score.popups.length = 0;
     switch (e.type) {
       case 'popUp':
         this.spray.burst(p.x, p.y, p.z, 14, 3.5);
@@ -228,20 +239,12 @@ class Game {
       case 'land': {
         this.spray.burst(p.x, p.y, p.z, 30, 6);
         this.cam.addShake(0.25);
-        // Milestone 2 turns these into points.
-        const spins = Math.round(Math.abs(e.spin) / Math.PI) * 180;
-        const flips = Math.round(Math.abs(e.flip) / (Math.PI * 2));
-        const parts: string[] = [];
-        if (e.hopped) parts.push('WAVE HOP');
-        if (flips > 0) parts.push(`${flips > 1 ? `${flips}x ` : ''}${e.flip > 0 ? 'Front' : 'Back'}flip`);
-        if (spins > 0) parts.push(`${spins} spin`);
-        if (e.grab > 0) parts.push('Grab');
-        if (parts.length === 0 && e.airTime > 0.9) parts.push(e.seaward ? 'Out the back' : 'Big air');
-        if (parts.length > 0) this.hud.flash(`${parts.join(' + ')}!`, 'good', e.hopped ? 2 : 1.4);
+        if (e.hopped) this.hud.flash('WAVE HOP!', 'good', 1.6);
         break;
       }
       case 'trick':
-        this.hud.flash(`${e.name}!`, 'good', 1.1);
+      case 'trickEnd':
+      case 'barrel':
         break;
       case 'spray':
         // A fan of spray thrown out to sea off the top of the wave.
@@ -254,7 +257,6 @@ class Game {
       case 'kick':
         this.spray.burst(p.x, p.y, p.z, 18, 4);
         this.cam.addShake(0.18);
-        this.hud.flash('Air kick!', 'good', 0.8);
         break;
       case 'board':
         if (this.mode === 'playing') this.hud.flash(e.name, 'good', 0.9);
@@ -318,6 +320,7 @@ class Game {
       this.waves.update(step);
       this.debugKeys();
       this.surfer.step(step, this.input, this.cam.yaw);
+      this.score.update(step, this.surfer);
       this.input.consumePresses();
       this.cam.update(step, this.surfer, this.input, this.waves);
       if (++this.simTick % 2 === 0) {
@@ -332,7 +335,7 @@ class Game {
   readonly log: SurferEvent[] = [];
   private simTick = 0;
   get debug() {
-    return { surfer: this.surfer, waves: this.waves, input: this.input, hud: this.hud, cam: this.cam };
+    return { score: this.score, surfer: this.surfer, waves: this.waves, input: this.input, hud: this.hud, cam: this.cam };
   }
 }
 

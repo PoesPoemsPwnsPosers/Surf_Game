@@ -202,7 +202,7 @@ export const CONFIG = {
   popUp: {
     /** The player may pop up when this far in front of the crest (multiples of face width). */
     minAhead: -0.1,
-    maxAhead: 1.5,
+    maxAhead: 1.4,
     /** The wave must be at least this tall where the player is. */
     minWaveHeight: 1.1,
     /** Speed along the board right after popping up. */
@@ -211,7 +211,9 @@ export const CONFIG = {
 
   surf: {
     /** Pull of gravity along the wave slope. Higher means faster drops and harder climbs. */
-    slopeGravity: 15,
+/** Whitewater only wipes the board out this close to the crest, in face widths. Lower down the face it can be ridden. */
+    foamZone: 0.55,
+        slopeGravity: 15,
     /** Fraction of that pull felt when climbing. Below 1 makes it easy to reach the lip. */
     climbEase: 0.3,
     /** With no steering held, the board straightens out along the wave at this rate (radians per second). */
@@ -369,6 +371,70 @@ export const CONFIG = {
       /** Speed gained dropping back down. */
       speedGain: 2,
     },
+  },
+
+  /** The barrel: the pocket under the curling lip, just ahead of where the wave is breaking. */
+  barrel: {
+    /** How far ahead of the whitewater edge the barrel reaches (metres along the wave). */
+    width: 9,
+    /** How far into the whitewater still counts (negative, metres). */
+    inside: -1.5,
+    /** Where on the face it counts, in face widths ahead of the crest. */
+    minAhead: 0.45,
+    maxAhead: 1.4,
+    /** The wave must be at least this tall here (metres). */
+    minHeight: 2.2,
+    /** Shorter visits than this do not score (seconds). */
+    minTime: 0.4,
+    /** How far the lip throws forward over the face, in face widths, and how far its tip drops (metres). */
+    lipReach: 1.6,
+    lipDrop: 1.4,
+    lipRise: 1.2,
+  },
+
+  /** Cool points. Every number the scoring uses. */
+  points: {
+    /** Riding flat out: this many points every `speedEvery` seconds above `speedFraction` of the board's top speed. */
+    speed: 5,
+    speedEvery: 1.5,
+    speedFraction: 1.08,
+    /** Any air that lasts at least `airMinTime`: a base plus points per second. */
+    air: 20,
+    airPerSecond: 10,
+    airMinTime: 0.6,
+    /** An air higher than `bigAirHeight` metres earns this on top. */
+    bigAir: 50,
+    bigAirHeight: 6,
+    /** Per half turn of spin, and per full flip. */
+    spin180: 30,
+    flip: 100,
+    /** A grab: a base plus points per second held. */
+    grab: 25,
+    grabPerSecond: 20,
+    /** Each air kick used in a flight that lands. */
+    airKick: 10,
+    /** Flying out the back of the wave, and landing on a different wave. */
+    outTheBack: 30,
+    waveHop: 150,
+    /** Wave tricks. Hold tricks also pay per second held. */
+    cutback: 40,
+    snap: 50,
+    hangTen: 20,
+    hangTenPerSecond: 15,
+    tailSlide: 40,
+    tailSlidePerSecond: 10,
+    floater: 60,
+    floaterPerSecond: 15,
+    /** Barrel riding, per second, paid on the way out. A long barrel is the big one. */
+    barrelPerSecond: 40,
+    /** Doing the same wave trick again in one ride is worth this much of the last time, down to the floor. */
+    repeatFalloff: 0.7,
+    repeatFloor: 0.25,
+    /** The multiplier goes up by one for every this many moves in a ride, up to the cap. */
+    movesPerMultiplier: 2,
+    maxMultiplier: 10,
+    /** A wipeout loses the unbanked combo and this fraction of the banked total. */
+    wipeoutPenalty: 0.05,
   },
 
   /** The glowing light trail behind the board, like tail lights in a long-exposure photo. */

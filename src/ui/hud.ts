@@ -1,5 +1,6 @@
 import { CONFIG } from '../config';
 import type { WaveSystem } from '../ocean/waves';
+import type { Popup, Score } from '../game/score';
 import type { Surfer } from '../player/surfer';
 
 const el = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
@@ -22,6 +23,16 @@ export class Hud {
   private overlayTitle = el('overlay-title');
   private overlaySub = el('overlay-sub');
   private overlayButton = el<HTMLButtonElement>('overlay-button');
+  private scoreTotal = el('score-total');
+  private combo = el('combo');
+  private comboMult = el('combo-mult');
+  private comboPot = el('combo-pot');
+  private popups = el('popups');
+  private barrelTag = el('barrel-tag');
+  private shownTotal = 0;
+  private lastTotalText = '';
+  private lastPot = -1;
+  private lastMult = 0;
   private pips: HTMLElement[] = [];
   private bannerTimer = 0;
   private lastLabel = '';
@@ -57,7 +68,44 @@ export class Hud {
     this.bannerTimer = seconds;
   }
 
-  update(dt: number, surfer: Surfer, waves: WaveSystem): void {
+  /** Rising text for one scored move, e.g. "Backflip +100". */
+  popup(p: Popup): void {
+    const row = document.createElement('div');
+    row.className = `popup ${p.kind}`;
+    const sign = p.points >= 0 ? '+' : '−';
+    row.innerHTML = `${p.text} <b>${sign}${Math.abs(p.points).toLocaleString('en-US')}</b>`;
+    this.popups.appendChild(row);
+    while (this.popups.childElementCount > 7) this.popups.firstElementChild!.remove();
+    row.addEventListener('animationend', () => row.remove());
+    if (p.kind === 'bank') this.flash(`BANKED +${p.points.toLocaleString('en-US')}`, 'good', 1.8);
+  }
+
+  update(dt: number, surfer: Surfer, waves: WaveSystem, score: Score): void {
+    // Cool points: the banked total counts up to its new value.
+    const gap = score.total - this.shownTotal;
+    this.shownTotal = Math.abs(gap) < 1 ? score.total : this.shownTotal + gap * Math.min(1, dt * 6);
+    const totalText = Math.round(this.shownTotal).toLocaleString('en-US');
+    if (totalText !== this.lastTotalText) {
+      this.scoreTotal.textContent = totalText;
+      this.lastTotalText = totalText;
+    }
+    const pot = Math.round(score.pot);
+    const mult = score.multiplier;
+    if (pot !== this.lastPot || mult !== this.lastMult) {
+      if (mult > this.lastMult && pot > 0) {
+        // Restart the bump animation.
+        this.comboMult.classList.remove('bump');
+        void this.comboMult.offsetWidth;
+        this.comboMult.classList.add('bump');
+      }
+      this.comboPot.textContent = pot.toLocaleString('en-US');
+      this.comboMult.textContent = `x${mult}`;
+      this.combo.classList.toggle('on', pot > 0);
+      this.lastPot = pot;
+      this.lastMult = mult;
+    }
+    this.barrelTag.classList.toggle('on', surfer.inBarrel && surfer.barrelTime > 0.25);
+
     // Set timer: counts down to the next set reaching the lineup.
     const s = waves.setStatus();
     const label = s.setActive ? 'SET ROLLING IN' : `NEXT SET IN ${Math.ceil(s.secondsToNext)}s`;
@@ -96,7 +144,7 @@ export class Hud {
         break;
       case 'surf':
         hint =
-          '<b>A D</b> carve · <b>Shift</b> pump · <b>Space</b> jump · aim straight up the face to fly out the back<br>' +
+          '<b>A D</b> carve · <b>Shift</b> pump · <b>S</b> stall for the barrel · <b>Space</b> jump · aim up the face to fly out the back<br>' +
           'Tricks: <b>Q</b> cutback · <b>E</b> snap · <b>W+Q</b> hang ten · <b>S+Q</b> tail slide · <b>W+E</b> floater';
         break;
       case 'air':

@@ -86,3 +86,23 @@ button:not(:disabled):active { transform: translateY(3px); box-shadow: 0 2px 0 #
 #kicks { font-size: 12px; letter-spacing: 0.12em; margin-top: 4px; display: flex; gap: 5px; justify-content: flex-end; align-items: center; }
 .kick { display: inline-block; width: 30px; height: 9px; border-radius: 5px; background: rgba(255, 255, 255, 0.28); overflow: hidden; }
 .kick > span { display: block; height: 100%; background: var(--sun); }
+
+/* Cool points */
+#score { position: absolute; left: 26px; top: 18px; }
+#hud .label { font-size: 12px; font-weight: 800; letter-spacing: 0.14em; opacity: 0.9; }
+#score-total { font-size: 44px; font-weight: 900; font-style: italic; line-height: 1; color: var(--sun); }
+#combo { position: absolute; left: 26px; top: 92px; display: flex; align-items: center; gap: 10px; opacity: 0; transform: translateX(-12px); transition: opacity 0.2s, transform 0.2s; }
+#combo.on { opacity: 1; transform: none; }
+#combo-mult { font-size: 34px; font-weight: 900; font-style: italic; color: #fff; background: var(--coral); border-radius: 12px; padding: 2px 12px 4px; text-shadow: none; box-shadow: 0 3px 0 rgba(13, 43, 69, 0.35); }
+#combo-mult.bump { animation: bump 0.35s ease-out; }
+@keyframes bump { from { transform: scale(1.6) rotate(-6deg); } to { transform: none; } }
+#combo-pot { font-size: 26px; font-weight: 900; font-style: italic; line-height: 1; }
+#popups { position: absolute; left: 26px; top: 150px; display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
+.popup { font-size: 19px; font-weight: 800; font-style: italic; white-space: nowrap; animation: popup 2.2s ease-out forwards; }
+.popup b { color: var(--sun); margin-left: 4px; }
+.popup.bank { font-size: 24px; color: var(--sun); }
+.popup.lost, .popup.lost b { color: var(--coral); }
+@keyframes popup { 0% { opacity: 0; transform: translateX(-24px) scale(1.25); } 10% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-10px); } }
+#barrel-tag { position: absolute; left: 50%; top: 27%; transform: translateX(-50%); font-size: 22px; font-weight: 900; font-style: italic; letter-spacing: 0.12em; color: var(--sun); opacity: 0; transition: opacity 0.15s; }
+#barrel-tag.on { opacity: 1; }
+.controls .lead { margin-left: 0; font-weight: 700; }

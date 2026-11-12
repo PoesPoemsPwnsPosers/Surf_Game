@@ -20,8 +20,8 @@ Other commands: `npm run build` (type check and production build), `npm run type
 | Milestone | State |
 | --- | --- |
 | 1. Surfing feel | Built and playtested |
-| 1.5. Feel update: boards, wave tricks, flying out the back | **Built. Waiting for playtest.** |
-| 2. Points, combos, on-screen score | Not started |
+| 1.5. Feel update: boards, wave tricks, flying out the back | Built and playtested |
+| 2. Points, combos, on-screen score | **Built. Waiting for playtest.** |
 | 3. Venice Beach world, walking, shop, saving | Not started |
 | 4. Stingray boss | Not started |
 | 5. Polish: sound, title and controls screens, performance | Not started |
@@ -102,12 +102,65 @@ How the boards compare in scripted playtests (same wave, same inputs):
 
 Speeds are along the board; the speed readout in the game also includes the wave carrying you.
 
+## What is built (milestone 2, points)
+
+Two feel changes asked for after the 1.5 playtest came first:
+
+- **Landings keep their momentum.** The board lands going the way it was flying, at the speed it
+  was flying, and the hands-off autopilot then carves it back into a trim line over about a
+  second. Nothing snaps round any more. Landing against an oncoming face soaks up part of the
+  speed (`air.landFaceAbsorb`), which is what keeps wave hops sticking.
+- **Tail light trails.** Two glowing red streaks follow the tail of the board and fade over
+  about a second, like tail lights in a long-exposure photo. They get brighter with speed and
+  float on top of waves that roll through them. Settings are under `trail` in the config.
+
+Points:
+
+- **Cool points.** Every move pops up on the left with its value ("Backflip +100") and goes
+  into a combo pot. Every two moves raise the multiplier by one, up to x10. Ending the ride
+  cleanly (riding out or to the beach) banks pot times multiplier into the total. A wipeout
+  loses the pot and 5% of the banked total (`points.wipeoutPenalty`).
+- **What scores** (all in `points` in the config):
+
+| Move | Points |
+| --- | --- |
+| Riding flat out (pumping past top speed) | 5 every 1.5 s. Adds to the pot, not the multiplier |
+| Air of 0.6 s or more | 20 + 10 per second. Big air (6 m or higher) adds 50 |
+| Spin | 30 per 180 |
+| Flip | 100 each |
+| Grab | 25 + 20 per second held |
+| Air kick | 10 each |
+| Out the back | 30 |
+| Wave hop (land on a different wave) | 150 |
+| Cutback / Snap | 40 / 50 |
+| Hang ten / Tail slide / Floater | 20 / 40 / 60, plus 15 / 10 / 15 per second held |
+| Barrel | 40 per second, paid on the way out |
+
+  Repeating the same wave trick in one ride is worth 70% of the last time, down to 25%.
+- **Barrels.** Each breaking wave now throws a curling lip over the pocket just ahead of the
+  whitewater. Stall with S (or tail slide) to let it catch up, stay under it, and "IN THE
+  BARREL" shows while the clock runs. The lip is visual; the rule and the lip share the
+  numbers under `barrel` in the config.
+- **Whitewater is more forgiving.** It only wipes the board out close to the crest
+  (`surf.foamZone`). Lower on the face it can be ridden to the beach, so a ride that the
+  whitewater catches still banks. This was needed: before it, the hands-off ride after a
+  combo often ended in a foam wipeout that threw the combo away.
+- **Fixed:** the cutback was being cancelled before it counted when done at speed.
+- **Points per minute, measured.** A scripted "average" player (per ride: one cutback, one
+  snap, one jump with a 180, a hang ten every other ride, then riding in; one ride per set, no
+  wipeouts) banked about **1,100 points per minute** on the Foamie and about the same on the
+  Shortboard, roughly 500 to 600 per ride. So a weapon that should take 5 minutes costs about
+  5,500. A player who chains hops, flips and barrels will earn several times that, because the
+  multiplier grows with the number of moves; that is worth watching in the playtest before
+  shop prices are set.
+- Points are not saved yet. Saving comes with the shop in milestone 3.
+
 ## Controls (final layout so far)
 
 | Key | In the water | On a wave | In the air |
 | --- | --- | --- | --- |
 | W | Paddle forward (away from the camera) | Lean in for a little extra speed | Front flip |
-| S | Paddle back | Stall (brake) | Back flip |
+| S | Paddle back | Stall (brake). Next to the whitewater this is how to get barrelled | Back flip |
 | A / D | Paddle left / right | Carve left / right | Steer the flight |
 | Space | Pop up when a wave reaches you | Jump | Air kick (needs a charge) |
 | Shift | Sprint paddle | Pump for speed | With W / S: stretch or shorten the flight |
@@ -155,6 +208,9 @@ src/
   player/surferModel.ts  the surfer and board (placeholder model)
   camera/followCamera.ts follow camera
   fx/particles.ts        spray
+  fx/trail.ts            tail light trails
+  game/score.ts          cool points, combo, multiplier, banking
+  ocean/lipMesh.ts       the curling lip over the barrel
   ui/hud.ts, style.css   on-screen display
 ```
 
@@ -167,8 +223,8 @@ add its wave settings to `config.ts`, and add one line to `src/levels/index.ts`.
   pack models. Nothing was downloaded for milestone 1 so the feel could be tuned first. The
   plan is to swap in CC0 models (Kenney, Quaternius) when the walkable world is built in
   milestone 3. `CREDITS.md` lists what is used.
-- **The wave has no hollow tube yet.** It is a smooth steep face with a foam lip. Barrel
-  rides need a curling lip, which is planned with barrel scoring in milestone 2.
+- **The barrel is simple.** The lip is a curved sheet over the pocket and the scoring is a zone
+  check. There is no closed tube to see down, and nothing knocks the rider off for touching the lip.
 - **No sound.** That is milestone 5.
 - **The player starts in the water** just inside the lineup. Starting on the pier comes with
   the world in milestone 3.
@@ -179,6 +235,10 @@ add its wave settings to `config.ts`, and add one line to `src/levels/index.ts`.
   on every board with and without pumping; a grab; an air kick; steering in the air; wave hops
   and flat-water landings. The numbers are a starting point: how it feels in the hand, camera
   motion and frame rate on a real graphics card have not been judged by a person yet.
+- Milestone 2 scripts: a full combo banked at the end of a ride, a wipeout losing the pot, a
+  3 second barrel, all five wave tricks scoring, wave hops on the first three boards after the
+  landing change, and two 4.5 minute sessions for points per minute. The pop-up fade timing and
+  how the trail looks in motion were only seen in still screenshots.
 - **Not covered by a script:** the "big lip throws you back" rule right at the peak and in the
   pocket by the whitewater (the scripted launches were all on the open face), Shift+S
   shortening a flight, and the right mouse button for grabs (F was used).
@@ -188,4 +248,4 @@ add its wave settings to `config.ts`, and add one line to `src/levels/index.ts`.
 
 ## What is left
 
-Milestones 2 to 5 in the table above, in that order.
+Milestones 3 to 5 in the table above, in that order.
