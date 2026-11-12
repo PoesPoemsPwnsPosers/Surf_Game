@@ -106,3 +106,23 @@ button:not(:disabled):active { transform: translateY(3px); box-shadow: 0 2px 0 #
 #barrel-tag { position: absolute; left: 50%; top: 37%; transform: translateX(-50%); font-size: 22px; font-weight: 900; font-style: italic; letter-spacing: 0.12em; color: var(--sun); opacity: 0; transition: opacity 0.15s; }
 #barrel-tag.on { opacity: 1; }
 .controls .lead { margin-left: 0; font-weight: 700; }
+
+/* Shop */
+.shop-panel { text-align: left; width: min(640px, 94vw); }
+.shop-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 6px; }
+.shop-wallet { text-align: right; display: flex; flex-direction: column; }
+.shop-wallet .label { font-size: 11px; font-weight: 800; letter-spacing: 0.14em; opacity: 0.7; }
+#shop-points { font-size: 32px; font-weight: 900; font-style: italic; color: #d99a00; line-height: 1; }
+.shop-group { font-weight: 900; color: var(--coral); letter-spacing: 0.06em; text-transform: uppercase; font-size: 12px; margin: 12px 0 4px; border-top: 2px solid rgba(13, 43, 69, 0.12); padding-top: 8px; }
+.shop-row { display: flex; align-items: center; gap: 12px; padding: 5px 0; }
+.shop-text { flex: 1; display: flex; flex-direction: column; font-size: 13px; line-height: 1.35; }
+.shop-text b { font-size: 16px; }
+.shop-text .short { color: var(--coral); font-weight: 700; }
+.shop-row button { font-size: 14px; padding: 8px 14px; border-radius: 10px; box-shadow: 0 3px 0 #0e7f8e; min-width: 118px; white-space: nowrap; }
+.shop-row.owned button { background: var(--ink); box-shadow: 0 3px 0 #000; }
+.shop-row.equipped button, .shop-row.done button { background: #7bd389; box-shadow: none; opacity: 1; color: var(--ink); }
+.shop-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; }
+.shop-foot button { font-size: 16px; padding: 10px 20px; }
+button.quiet { background: transparent; color: var(--ink); box-shadow: none; font-size: 13px; font-weight: 700; opacity: 0.6; text-decoration: underline; padding: 6px; }
+#loadout { font-size: 13px; letter-spacing: 0.04em; margin-top: 2px; }
+#loadout .heart { color: var(--coral); }

@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config';
 import type { Input } from '../core/input';
-import type { WaveSystem } from '../ocean/waves';
 import type { Surfer } from '../player/surfer';
 
 const TAU = Math.PI * 2;
@@ -42,7 +41,8 @@ export class FollowCamera {
     this.shake = Math.max(this.shake, amount);
   }
 
-  update(dt: number, surfer: Surfer, input: Input, waves: WaveSystem): void {
+  /** @param floorAt the lowest the camera may go at a point (water or land height) */
+  update(dt: number, surfer: Surfer, input: Input, floorAt: (x: number, z: number) => number): void {
     const C = CONFIG.camera;
     const riding = surfer.state === 'surf' || surfer.state === 'air';
     let dist = C.distance;
@@ -105,8 +105,8 @@ export class FollowCamera {
     this.pos.lerp(this.want, k);
     this.look.lerp(this.lookTarget, 1 - Math.exp(-dt * C.positionFollow * 1.6));
 
-    // Never dip under the water.
-    const floor = waves.height(this.pos.x, this.pos.z) + 1.1;
+    // Never dip under the water or the sand.
+    const floor = floorAt(this.pos.x, this.pos.z) + 1.1;
     if (this.pos.y < floor) this.pos.y = floor;
 
     this.camera.position.copy(this.pos);
@@ -117,7 +117,7 @@ export class FollowCamera {
     }
     this.camera.lookAt(this.look);
 
-    const speedT = Math.min(1, surfer.displaySpeed / (surfer.board.pumpMaxSpeed + waves.tuning.speed));
+    const speedT = Math.min(1, surfer.displaySpeed / (surfer.board.pumpMaxSpeed + 8));
     const fov = C.fov + C.speedFov * (riding ? speedT : 0);
     if (Math.abs(fov - this.camera.fov) > 0.05) {
       this.camera.fov += (fov - this.camera.fov) * (1 - Math.exp(-dt * 4));

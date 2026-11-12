@@ -1,12 +1,14 @@
 import * as THREE from 'three';
 import { CONFIG } from '../../config';
 import type { LevelEnvironment, WaterSurface } from '../../core/level';
+import { SAND_PROFILE } from './layout';
+import { buildPier } from './pier';
 
 /**
- * Venice Beach scenery. Milestone 1 only needs a backdrop: sky, sun, sand,
- * palms, a row of bright boardwalk buildings and lineup buoys. All of it is
- * built from primitives for now. The walkable boardwalk, pier and shop
- * arrive in milestone 3.
+ * Venice Beach scenery: sky, sun, sand, palms, a row of bright boardwalk
+ * buildings and lineup buoys, plus the pier and shop from ./pier. All of it
+ * is built from simple shapes for now. Where things are comes from ./layout,
+ * which the walking rules share.
  */
 
 function rng(seed: number): () => number {
@@ -145,14 +147,7 @@ export function buildVeniceEnvironment(scene: THREE.Scene, water: WaterSurface):
   }
 
   // Sand: slopes up out of the water, then levels off toward the boardwalk.
-  const rows = [
-    { z: W.shoreZ - 30, y: -2.6 },
-    { z: W.shoreZ, y: 0.0 },
-    { z: W.shoreZ + 9, y: 0.55 },
-    { z: W.shoreZ + 40, y: 1.9 },
-    { z: W.shoreZ + 75, y: 2.2 },
-    { z: W.shoreZ + 400, y: 2.2 },
-  ];
+  const rows = SAND_PROFILE;
   const cols = 41;
   const halfSpan = 700;
   const verts: number[] = [];
@@ -164,7 +159,8 @@ export function buildVeniceEnvironment(scene: THREE.Scene, water: WaterSurface):
   rows.forEach((row, r) => {
     for (let i = 0; i < cols; i++) {
       const x = -halfSpan + (i / (cols - 1)) * halfSpan * 2;
-      const bump = r > 1 && r < 5 ? (rand() - 0.5) * 0.35 : 0;
+      // Tiny bumps only: the walking rules use the smooth profile.
+      const bump = r > 1 && r < 4 ? (rand() - 0.5) * 0.12 : 0;
       verts.push(x, row.y + bump, row.z);
       if (r <= 1) cc.copy(wet);
       else if (r <= 3) cc.copy(dry);
@@ -193,10 +189,12 @@ export function buildVeniceEnvironment(scene: THREE.Scene, water: WaterSurface):
   );
   scene.add(sand);
 
+  buildPier(scene);
+
   // Palms along the back of the beach, like the boardwalk in the reference photos.
   for (let i = 0; i < 26; i++) {
     const palm = makePalm(rand);
-    palm.position.set(-330 + i * 26 + (rand() - 0.5) * 10, 2.0, W.shoreZ + 62 + rand() * 10);
+    palm.position.set(-330 + i * 26 + (rand() - 0.5) * 10, 2.0, W.shoreZ + 56 + rand() * 8);
     palm.rotation.y = rand() * Math.PI * 2;
     scene.add(palm);
   }

@@ -4,7 +4,7 @@ import * as THREE from 'three';
  * Placeholder low-poly surfer and board built from primitives.
  * Board axes: +Z is the nose, +Y is up.
  */
-export type Pose = 'prone' | 'stand' | 'air' | 'tumble' | 'hangTen' | 'slide' | 'float' | 'grab';
+export type Pose = 'walk' | 'prone' | 'stand' | 'air' | 'tumble' | 'hangTen' | 'slide' | 'float' | 'grab';
 
 interface PoseTargets {
   bodyY: number;
@@ -21,6 +21,19 @@ interface PoseTargets {
 }
 
 const POSES: Record<Pose, PoseTargets> = {
+  // On foot, board under one arm.
+  walk: {
+    bodyY: 0.76,
+    bodyPitch: 0,
+    bodyYaw: 0,
+    torsoLean: 0.05,
+    legSpread: 0.04,
+    kneeTuck: 0,
+    armRaise: 0.18,
+    headPitch: 0,
+    headYaw: 0,
+    riderZ: 0,
+  },
   prone: {
     bodyY: 0.2,
     bodyPitch: Math.PI / 2,
@@ -250,7 +263,7 @@ export class SurferModel {
   }
 
   /**
-   * @param paddling 0 to 1, how hard the arms are stroking (prone only)
+   * @param paddling 0 to 1, how hard the arms are stroking (prone), or how fast the legs are going (walk)
    * @param crouch 0 to 1, extra crouch while standing (pumping, landing)
    * @param tumble radians of rider tumble (wipeout only)
    */
@@ -274,7 +287,15 @@ export class SurferModel {
     this.legL.rotation.set(-c.kneeTuck, 0, c.legSpread + crouch * 0.15);
     this.legR.rotation.set(-c.kneeTuck, 0, -c.legSpread - crouch * 0.15);
 
-    if (this.pose === 'prone') {
+    if (this.pose === 'walk') {
+      // Legs and the free arm swing; the other arm holds the board.
+      const swing = Math.sin(this.clock * 1.6) * 0.75 * Math.min(1, paddling);
+      this.legL.rotation.x = swing;
+      this.legR.rotation.x = -swing;
+      this.armL.rotation.set(-swing * 0.8, 0, c.armRaise);
+      this.armR.rotation.set(0.25, 0, -0.5);
+      this.body.position.y += Math.abs(Math.sin(this.clock * 1.6)) * 0.05 * Math.min(1, paddling);
+    } else if (this.pose === 'prone') {
       // Alternating paddle strokes.
       const a = Math.sin(this.clock) * (0.35 + paddling * 0.9);
       this.armL.rotation.set(Math.PI + a, 0, c.armRaise);
@@ -290,13 +311,24 @@ export class SurferModel {
       this.rider.position.set(0.6 * Math.sin(tumble), 0.4 + 0.5 * Math.abs(Math.sin(tumble * 0.6)), -0.5);
       this.board.rotation.set(tumble * 0.9, 0, tumble * 1.6);
       this.board.position.set(-0.8, 0.2, 0.6);
+    } else if (this.pose === 'walk') {
+      const r = 1 - Math.exp(-dt * 10);
+      this.rider.rotation.set(0, 0, 0);
+      this.rider.position.multiplyScalar(1 - r);
+      // Board on its edge, tucked under the arm.
+      this.board.rotation.z += (Math.PI / 2 - this.board.rotation.z) * r;
+      this.board.rotation.x = 0;
+      this.board.position.x += (-0.47 - this.board.position.x) * r;
+      this.board.position.y += (0.95 - this.board.position.y) * r;
+      this.board.position.z += (0.1 - this.board.position.z) * r;
     } else {
       const r = 1 - Math.exp(-dt * 10);
       this.rider.rotation.x += (0 - this.rider.rotation.x) * r;
       this.rider.rotation.y += (0 - this.rider.rotation.y) * r;
       this.rider.rotation.z += (0 - this.rider.rotation.z) * r;
       this.rider.position.multiplyScalar(1 - r);
-      this.board.rotation.set(0, 0, 0);
+      this.board.rotation.x = 0;
+      this.board.rotation.z *= 1 - r;
       this.board.position.multiplyScalar(1 - r);
     }
   }

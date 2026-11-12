@@ -18,6 +18,8 @@ export class Hud {
   private hint = el('hint');
   private boardName = el('board-name');
   private kicks = el('kicks');
+  private loadout = el('loadout');
+  private lastLoadout = '';
   private lastKicks = '';
   private overlay = el('overlay');
   private overlayTitle = el('overlay-title');
@@ -81,7 +83,18 @@ export class Hud {
     if (p.kind === 'bank') this.flash(`BANKED +${p.points.toLocaleString('en-US')}`, 'good', 1.8);
   }
 
-  update(dt: number, surfer: Surfer, waves: WaveSystem, score: Score): void {
+  /** Hearts and the weapon in hand, under the board name. */
+  setLoadout(hearts: number, weapon: string | null): void {
+    const key = `${hearts}:${weapon}`;
+    if (key === this.lastLoadout) return;
+    this.lastLoadout = key;
+    this.loadout.innerHTML = `<span class="heart">${'♥'.repeat(hearts)}</span>${weapon ? ` · ${weapon}` : ''}`;
+  }
+
+  /**
+   * @param action a prompt for something the player can do right here (for example open the shop), or ''
+   */
+  update(dt: number, surfer: Surfer, waves: WaveSystem, score: Score, action = ''): void {
     // Cool points: the banked total counts up to its new value.
     const gap = score.total - this.shownTotal;
     this.shownTotal = Math.abs(gap) < 1 ? score.total : this.shownTotal + gap * Math.min(1, dt * 6);
@@ -128,7 +141,10 @@ export class Hud {
     // Prompt in the middle of the screen.
     let prompt = '';
     let go = false;
-    if (surfer.state === 'paddle') {
+    if (action) {
+      prompt = action;
+      go = true;
+    } else if (surfer.state === 'paddle') {
       if (surfer.canPopUp) {
         prompt = 'SPACE: POP UP!';
         go = true;
@@ -145,6 +161,9 @@ export class Hud {
     // Context controls, bottom left.
     let hint = '';
     switch (surfer.state) {
+      case 'walk':
+        hint = '<b>WASD</b> walk · <b>Shift</b> run · <b>Space</b> hop · jump off the end of the pier to go surfing · <b>F</b> at the shop';
+        break;
       case 'paddle':
         hint = '<b>WASD</b> paddle · <b>Shift</b> sprint · wait by the buoys, then <b>Space</b> on a wave';
         break;

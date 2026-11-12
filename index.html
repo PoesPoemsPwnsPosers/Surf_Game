@@ -30,7 +30,7 @@
       <div id="barrel-tag">IN THE BARREL</div>
       <div id="banner"></div>
       <div id="prompt"></div>
-      <div id="board"><span id="board-name"></span><div id="kicks"></div></div>
+      <div id="board"><span id="board-name"></span><div id="loadout"></div><div id="kicks"></div></div>
       <div id="speed"><span id="speed-value">0</span><span class="unit">mph</span></div>
       <div id="hint"></div>
     </div>
@@ -42,6 +42,9 @@
         <button id="overlay-button" disabled>Loading…</button>
         <p class="start-hint">or press Enter</p>
         <div class="controls">
+          <div class="group">On land</div>
+          <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Walk. <b>Shift</b> runs, <b>Space</b> hops. Jump off the end of the pier or wade in to start paddling.</span></div>
+          <div><kbd>F</kbd><span>Open the surf shop (stand on the yellow mat on the pier). Spend cool points on boards, hearts, weapons and the boss fight.</span></div>
           <div class="group">In the water</div>
           <div><span class="lead">Every move adds to your combo and raises the multiplier. Ride it out cleanly to bank it. Wipe out and the combo is gone.</span></div>
           <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Paddle. Hold <b>Shift</b> to sprint.</span></div>
@@ -59,8 +62,23 @@
           <div><kbd>Shift</kbd>+<kbd>W</kbd>/<kbd>S</kbd><span>Stretch or shorten the flight.</span></div>
           <div><kbd>Space</kbd><span>Air kick for extra height and distance. Earn kicks by landing tricks and riding fast.</span></div>
           <div class="group">Other</div>
-          <div><kbd>1</kbd>-<kbd>4</kbd><span>Swap boards (test keys until the shop exists).</span><kbd>Esc</kbd><span>Pause.</span></div>
+          <div><kbd>Esc</kbd><span>Pause.</span></div>
         </div>
+      </div>
+    </div>
+
+    <div id="shop" class="overlay hidden">
+      <div class="panel shop-panel">
+        <div class="shop-head">
+          <h1>Surf Shop</h1>
+          <div class="shop-wallet"><span class="label">COOL POINTS</span><span id="shop-points">0</span></div>
+        </div>
+        <div id="shop-list"></div>
+        <div class="shop-foot">
+          <button id="shop-close">Back to the pier</button>
+          <button id="shop-reset" class="quiet">Reset progress</button>
+        </div>
+        <p id="shop-note" class="start-hint"></p>
       </div>
     </div>
 

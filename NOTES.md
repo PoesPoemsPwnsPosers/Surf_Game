@@ -21,8 +21,8 @@ Other commands: `npm run build` (type check and production build), `npm run type
 | --- | --- |
 | 1. Surfing feel | Built and playtested |
 | 1.5. Feel update: boards, wave tricks, flying out the back | Built and playtested |
-| 2. Points, combos, on-screen score | **Built. Waiting for playtest.** |
-| 3. Venice Beach world, walking, shop, saving | Not started |
+| 2. Points, combos, on-screen score | Built and playtested |
+| 3. Venice Beach world, walking, shop, saving | **Built. Waiting for playtest.** |
 | 4. Stingray boss | Not started |
 | 5. Polish: sound, title and controls screens, performance | Not started |
 
@@ -178,7 +178,82 @@ Points:
   the barrel (3 s), a jump inside the barrel (wipes out), the five wave tricks, the banked combo,
   and the points-per-minute session (still about 1,100 on the Foamie).
 
+## What is built (milestone 3, world, shop, saving)
+
+First, one more change from the playtest:
+
+- **The lip is solid on top.** The lip's shape now lives in one file (`ocean/lip.ts`) that both
+  the picture and the physics use. Come at it from the crest (a floater, W+E, is the easy way)
+  or land on it from the air and the board rides along the top of the arch ("ON THE LIP",
+  30 points a second). Running off the end of it is a launch. From underneath it is still the
+  barrel, and jumping up into it is still a wipeout.
+
+The world:
+
+- **You start on Venice Pier**, standing next to the surf shop, with the board under your arm.
+- **Walking.** WASD walks, Shift runs, Space hops. You can walk the pier, down its ramp to the
+  boardwalk, across the sand and under the pier.
+- **Getting in the water.** Jump or walk off the pier (the sea end has no railing) and you
+  splash in and start paddling. Or wade in from the beach. Paddle or ride into the shallows and
+  the surfer stands up and walks. A ride that reaches the beach ends on the sand.
+- **Scenery.** The pier with pilings, railings and lamps, the shop hut with its sign and a
+  yellow mat in front of the counter, a boardwalk strip with benches, and three lifeguard
+  towers. All simple shapes (see `CREDITS.md`).
+
+The shop (stand on the yellow mat, press F; the game pauses while it is open):
+
+| Item | Price | What it does |
+| --- | --- | --- |
+| Foamie | free | The starter board |
+| Fish | 1,500 | |
+| Shortboard | 4,000 | |
+| Pro Gun | 8,000 | |
+| Extra heart, 3 levels | 1,000 / 2,500 / 4,500 | 3 hearts to start, up to 6. For the boss fight |
+| Super Squirter | 5,000 | Weapons do nothing until the boss fight (milestone 4) |
+| Coconut Cannon | 6,000 | |
+| Trident Launcher | 7,000 | |
+| Stingray Showdown | 12,000 | The boss fight. Buying it is recorded; the fight is milestone 4 |
+
+- **Boards replace the Speed and Balance upgrades**, as recommended after milestone 1.5: each
+  board is faster and more forgiving than the last. Health stays as its own upgrade. Owned
+  boards and weapons can be switched in the shop for free.
+- Prices are in `shop` in the config. At the measured 1,100 points a minute a weapon is about
+  5 minutes, and everything in the shop is about 45 minutes of modest play.
+- **Saving.** Points, boards, hearts, weapons and the boss ticket are saved in the browser
+  (`localStorage`) every time the banked total changes or something is bought. "Reset progress"
+  at the bottom of the shop wipes it (two clicks). If the browser blocks storage the game still
+  runs and the shop says so.
+- The 1 to 4 board keys are now off. `debug.boardKeys` in the config turns them back on, and
+  `debug.startPoints` gives a new save some points to test the shop with.
+
+### Modularity review
+
+What was wrong and what changed:
+
+- `main.ts` had grown to 350 lines doing six jobs. It is now 10 lines of start-up. The loop and
+  the modes (start, playing, paused, shop) are in `game/game.ts`; spray, the light trail and the
+  flight markers moved to `fx/surfEffects.ts`.
+- The lip's shape was written twice (once to draw it, once for the barrel rule). It is now one
+  description in `ocean/lip.ts`.
+- Each new feature went in as its own part with one job, and none of them reach into another's
+  insides: `game/save.ts` (reading and writing the save), `game/shop.ts` (the shop's rules, no
+  screen code), `ui/shopPanel.ts` (the shop screen, no rules), `player/walker.ts` (walking, knows
+  nothing about surfing), `levels/venice/layout.ts` (where things are; scenery and walking rules
+  both read it), `levels/venice/pier.ts` (pier scenery).
+- A level now provides its own land (`LandMap` in `core/level.ts`), so Mavericks and Pipeline can
+  have different beaches without touching the player code.
+- The camera no longer needs the wave system, only a "how low can I go here" function.
+- **Still too big:** `player/surfer.ts` is about 1,050 lines holding paddling, riding, flying and
+  wiping out. They share a lot of state (speed, heading, the wave being ridden), so splitting
+  them is a bigger job with more risk to the feel. The natural cut is one file per state
+  (ride, air, paddle) behind the same `Surfer` class. Worth doing before the boss fight adds
+  shooting, if you want it.
+- **Also noted:** `ui/hud.ts` builds its hint text from the surfer's state with a switch; fine at
+  this size, but the boss fight's health bar should be its own small class, not more of the HUD.
+
 ## Controls (final layout so far)
+
+On land: WASD walk, Shift run, Space hop, F opens the shop from the yellow mat on the pier.
 
 | Key | In the water | On a wave | In the air |
 | --- | --- | --- | --- |
@@ -190,11 +265,10 @@ Points:
 | Q | | Cutback. W+Q hang ten, S+Q tail slide | Spin left |
 | E | | Snap. W+E floater | Spin right |
 | F or right mouse | | | Grab |
-| 1 to 4 | Swap boards (test keys until the shop exists) | same | same |
 | Mouse | Look around | Nudge the view | Nudge the view |
 | Esc | Pause | Pause | Pause |
 
-Not wired up yet: **F on land** (interact, milestone 3) and **left click** (shoot, milestone 4).
+Not wired up yet: **left click** (shoot, milestone 4).
 Left click is kept free for shooting, which is why the grab is on F and the right button.
 
 The same list is on the start and pause screens in the game.
@@ -219,38 +293,47 @@ Vite reloads the page when the file is saved.
 
 ```
 src/
-  config.ts              every tuning number
-  main.ts                game loop, wiring, effects
-  core/input.ts          keyboard and mouse
-  core/level.ts          what a level has to provide
-  levels/index.ts        level list; each level is loaded on demand as its own chunk
-  levels/venice/         Venice Beach: wave settings, colours, scenery
-  ocean/waves.ts         wave sets and the water height function (shared by physics and visuals)
-  ocean/oceanMesh.ts     the low-poly sea
-  player/surfer.ts       paddling, riding, air, wipeouts
-  player/surferModel.ts  the surfer and board (placeholder model)
-  camera/followCamera.ts follow camera
-  fx/particles.ts        spray
-  fx/trail.ts            tail light trails
-  game/score.ts          cool points, combo, multiplier, banking
-  ocean/lipMesh.ts       the curling lip over the barrel
-  ui/hud.ts, style.css   on-screen display
+  config.ts               every tuning number, shop prices included
+  main.ts                 start-up only
+  game/game.ts            game loop, modes (start, playing, paused, shop), wiring
+  game/score.ts           cool points, combo, multiplier, banking
+  game/shop.ts            what the shop sells and what buying does
+  game/save.ts            reading and writing the save in the browser
+  core/input.ts           keyboard and mouse
+  core/level.ts           what a level has to provide (waves, colours, land, scenery)
+  levels/index.ts         level list; each level is loaded on demand as its own chunk
+  levels/venice/          Venice Beach: wave settings, layout, scenery, pier and shop hut
+  ocean/waves.ts          wave sets and the water height function (shared by physics and visuals)
+  ocean/lip.ts            the shape of the curling lip (shared by physics and visuals)
+  ocean/oceanMesh.ts      the low-poly sea
+  ocean/lipMesh.ts        draws the lip
+  player/surfer.ts        paddling, riding, air, wipeouts
+  player/walker.ts        walking on land
+  player/surferModel.ts   the surfer and board (placeholder model)
+  camera/followCamera.ts  follow camera
+  fx/surfEffects.ts       spray, light trail, shadow and landing ring
+  fx/particles.ts         spray particles
+  fx/trail.ts             tail light trails
+  ui/hud.ts, style.css    on-screen display
+  ui/shopPanel.ts         the shop screen
 ```
 
-Adding a beach: create `src/levels/<name>/index.ts` that default-exports a `LevelDefinition`,
+Adding a beach: create `src/levels/<name>/index.ts` that default-exports a `LevelDefinition`
+(waves, sea colours, a `LandMap` for its beach, and scenery),
 add its wave settings to `config.ts`, and add one line to `src/levels/index.ts`.
 
 ## Placeholders and known gaps
 
 - **The surfer, board, palms, buildings and buoys are simple shapes built in code**, not asset
-  pack models. Nothing was downloaded for milestone 1 so the feel could be tuned first. The
-  plan is to swap in CC0 models (Kenney, Quaternius) when the walkable world is built in
-  milestone 3. `CREDITS.md` lists what is used.
+  pack models, and so are the pier, the shop and the lifeguard towers. Nothing has been
+  downloaded yet. Swapping in CC0 models (Kenney, Quaternius) is now a polish job for
+  milestone 5. `CREDITS.md` lists what is used.
 - **The barrel is simple.** The lip is a curved sheet over the pocket and the scoring is a zone
   check. The lip you see is not a solid object: the only thing it does to the rider is wipe out a jump made underneath it.
 - **No sound.** That is milestone 5.
-- **The player starts in the water** just inside the lineup. Starting on the pier comes with
-  the world in milestone 3.
+- **Nothing on land is solid except the ground.** Railings, the shop hut, palms and towers can
+  be walked through, and a surfer can ride straight through the pier's pilings.
+- **Weapons and the boss ticket can be bought but do nothing yet.** That is milestone 4.
 - **Feel was tuned with scripted playtests, not by hand.** Scripts drove the real game in a
   browser and checked the results and screenshots. Milestone 1: paddle out, pop up, trim, pump,
   launch off the lip, backflip, 180 spin, a forced wipeout, pause and resume. Milestone 1.5:
@@ -262,7 +345,14 @@ add its wave settings to `config.ts`, and add one line to `src/levels/index.ts`.
   3 second barrel, all five wave tricks scoring, wave hops on the first three boards after the
   landing change, and two 4.5 minute sessions for points per minute. The pop-up fade timing and
   how the trail looks in motion were only seen in still screenshots.
-- **Not covered by a script:** the "big lip throws you back" rule right at the peak and in the
+- Milestone 3 scripts: riding on top of the lip for 2.3 s and launching off its end; starting on
+  the pier; opening the shop with no points (nothing can be bought) and with 25,000 (bought a
+  board, a heart, a weapon and the boss fight, total and save checked, save found in
+  `localStorage`); running off the pier into the sea; paddling ashore and walking up the beach;
+  wading back in. All the earlier surfing scripts were re-run afterwards.
+- **Not covered by a script:** reloading the page to see the save come back in a real browser
+  session, and whether saving works inside the hosted preview link.
+- **Also not covered by a script:** the "big lip throws you back" rule right at the peak and in the
   pocket by the whitewater (the scripted launches were all on the open face), Shift+S
   shortening a flight, and the right mouse button for grabs (F was used).
 - **Boards and the shop (recommendation for milestone 3):** let boards replace the separate
@@ -271,4 +361,4 @@ add its wave settings to `config.ts`, and add one line to `src/levels/index.ts`.
 
 ## What is left
 
-Milestones 3 to 5 in the table above, in that order.
+Milestones 4 and 5 in the table above, in that order.

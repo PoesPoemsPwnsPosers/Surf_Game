@@ -1,11 +1,13 @@
 import * as THREE from 'three';
 import { CONFIG, type BoardTuning } from '../config';
 import type { Input } from '../core/input';
+import type { LandMap } from '../core/level';
 import { lipTopAt } from '../ocean/lip';
 import { WaveSystem, clamp, smoothstep, type Wave, type WaveSample } from '../ocean/waves';
 import { SurferModel } from './surferModel';
+import { Walker } from './walker';
 
-export type SurferState = 'paddle' | 'surf' | 'air' | 'wipeout';
+export type SurferState = 'walk' | 'paddle' | 'surf' | 'air' | 'wipeout';
 
 /** Things that happened this step. The HUD, effects and (later) scoring listen to these. */
 export type SurferEvent =
@@ -38,7 +40,12 @@ export type SurferEvent =
   | { type: 'board'; name: string }
   | { type: 'wipeout'; reason: 'landing' | 'foam' | 'lip' }
   | { type: 'rideEnd'; rideTime: number }
-  | { type: 'respawn' };
+  | { type: 'respawn' }
+  /** Jumped or fell into the sea from the pier. */
+  | { type: 'splash'; height: number }
+  /** Walked up out of the water, or waded in. */
+  | { type: 'ashore' }
+  | { type: 'wadeIn' };
 
 export type WaveTrick = 'cutback' | 'snap' | 'hangTen' | 'tailSlide' | 'floater';
 const TRICK_NAMES: Record<WaveTrick, string> = {
@@ -160,7 +167,14 @@ export class Surfer {
   private sample: WaveSample = { wave: null as unknown as Wave, ahead: 0, localAmp: 0, foam: 0 };
   readonly events: SurferEvent[] = [];
 
-  constructor(private waves: WaveSystem) {
+  readonly walker: Walker;
+  private fallFrom = 0;
+
+  constructor(
+    private waves: WaveSystem,
+    private land: LandMap,
+  ) {
+    this.walker = new Walker(land, waves);
     this.reset();
     this.setBoard(CONFIG.startingBoardTier);
   }
@@ -173,13 +187,27 @@ export class Surfer {
     this.events.push({ type: 'board', name: b.name });
   }
 
+  /** Start a game: standing at the level's spawn point. */
   reset(): void {
-    this.pos.set(CONFIG.world.startX, 0, CONFIG.world.startZ);
-    this.state = 'paddle';
-    this.heading = Math.PI;
+    const sp = this.land.spawn;
+    this.walker.place(this.pos, sp.x, sp.z, sp.heading);
+    this.heading = sp.heading;
+    this.state = 'walk';
     this.speed = 0;
     this.vy = 0;
     this.stateTime = 0;
+    this.fallFrom = this.pos.y;
+    this.model.setPose('walk');
+  }
+
+  /** Put the surfer on the board in the water. Used after going out of bounds and by scripted playtests. */
+  placeInWater(x = CONFIG.world.startX, z = CONFIG.world.startZ): void {
+    this.pos.set(x, this.waves.height(x, z), z);
+    this.heading = Math.PI;
+    this.paddleVX = this.paddleVZ = 0;
+    this.speed = 0;
+    this.vy = 0;
+    this.setState('paddle');
     this.model.setPose('prone');
   }
 
@@ -206,12 +234,16 @@ export class Surfer {
     }
     if (this.state === 'air') return Math.hypot(this.airVX, this.airVZ + this.airFrame);
     if (this.state === 'paddle') return Math.hypot(this.paddleVX, this.paddleVZ);
+    if (this.state === 'walk') return this.walker.speed;
     return 0;
   }
 
   step(dt: number, input: Input, cameraYaw: number): void {
     this.stateTime += dt;
     switch (this.state) {
+      case 'walk':
+        this.stepWalk(dt, input, cameraYaw);
+        return;
       case 'paddle':
         this.stepPaddle(dt, input, cameraYaw);
         break;
@@ -227,7 +259,26 @@ export class Surfer {
     }
     const W = CONFIG.world;
     this.pos.x = clamp(this.pos.x, -W.halfWidth, W.halfWidth);
-    this.pos.z = clamp(this.pos.z, W.seaLimitZ, W.shoreZ - 3);
+    this.pos.z = clamp(this.pos.z, W.seaLimitZ, W.shoreZ + 4);
+  }
+
+  // ----------------------------------------------------------------- on foot
+
+  private stepWalk(dt: number, input: Input, cameraYaw: number): void {
+    const wasGrounded = this.walker.grounded;
+    if (wasGrounded) this.fallFrom = this.pos.y;
+    const result = this.walker.step(dt, input, cameraYaw, this.pos);
+    this.heading = this.walker.heading;
+    this.speed = this.walker.speed;
+    this.fallFrom = Math.max(this.fallFrom, this.pos.y);
+    if (result === 'walking') return;
+    // Into the sea: onto the board and paddling.
+    this.paddleVX = Math.sin(this.heading) * this.speed * 0.6;
+    this.paddleVZ = Math.cos(this.heading) * this.speed * 0.6;
+    this.setState('paddle');
+    this.model.setPose('prone');
+    if (result === 'splash') this.events.push({ type: 'splash', height: this.fallFrom - this.pos.y });
+    else this.events.push({ type: 'wadeIn' });
   }
 
   private setState(s: SurferState): void {
@@ -267,6 +318,17 @@ export class Surfer {
     this.pos.y = this.waves.height(this.pos.x, this.pos.z) + 0.04;
     this.vy = 0;
     this.carry = 0;
+
+    // Run aground on the sand: stand up and walk.
+    if (this.walker.canStand(this.pos.x, this.pos.z, CONFIG.walk.swimDepth * 0.5) && this.pos.z > CONFIG.world.shoreZ - 12) {
+      this.walker.arrive(this.pos, this.heading);
+      this.canPopUp = false;
+      this.waveIncoming = false;
+      this.setState('walk');
+      this.model.setPose('walk');
+      this.events.push({ type: 'ashore' });
+      return;
+    }
 
     // Can we catch a wave here?
     const U = CONFIG.popUp;
@@ -622,7 +684,7 @@ export class Surfer {
     }
 
     // The ride is over once the wave has gone and the board has slowed, or at the beach.
-    const atBeach = this.pos.z > CONFIG.world.shoreZ - 6;
+    const atBeach = this.pos.z > CONFIG.world.shoreZ - 3;
     if ((near < 0.05 && this.speed < S.endSpeed) || atBeach) {
       this.endRide();
     }
@@ -936,6 +998,18 @@ export class Surfer {
   /** Move the model to match the physics. Call once per rendered frame. */
   updateVisual(dt: number): void {
     const grounded = this.state === 'surf' || this.state === 'paddle';
+    if (this.state === 'walk') {
+      // On foot: upright, facing the way we walk, board under the arm.
+      this.normal.set(0, 1, 0);
+      this.lean *= Math.exp(-dt * 8);
+      this.airYaw = this.heading;
+      this.model.boardPivot.quaternion.setFromEuler(this.euler.set(0, this.heading, 0, 'YXZ'));
+      this.model.mount.quaternion.identity();
+      this.model.root.position.copy(this.pos);
+      const stride = clamp(this.walker.speed / CONFIG.walk.speed, 0, 1.7) * (this.walker.grounded ? 1 : 0.2);
+      this.model.update(dt, stride, 0, 0);
+      return;
+    }
     if (grounded) {
       this.surfaceGradient(this.pos.x, this.pos.z, this.grad);
       this.tmpN.set(-this.grad.x, 1, -this.grad.z).normalize();

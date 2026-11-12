@@ -72,7 +72,7 @@ export const CONFIG = {
     shoreZ: 34,
     /** Farthest the player may paddle out to sea. */
     seaLimitZ: -190,
-    /** Where the player starts in milestone 1 (in the water, just inside the lineup). */
+    /** Where a wipeout puts the player back if they have drifted out of bounds, and the fallback start. */
     startX: 0,
     startZ: -70,
   },
@@ -87,6 +87,8 @@ export const CONFIG = {
   boards: [
     {
       name: 'Foamie',
+      /** Shown in the shop. */
+      blurb: 'Slow and steady. Forgives rough landings on the wave, stays close to it in the air.',
       /**
        * Guiderails in the air, 0 to 1. At 1 the game steers airs back onto the wave: the wave
        * magnet, the wave-hop helper, and flying out the back only from a near-straight take-off
@@ -120,6 +122,8 @@ export const CONFIG = {
     },
     {
       name: 'Fish',
+      /** Shown in the shop. */
+      blurb: 'Quicker, with enough pop to reach the next wave.',
       guide: 1,
       launchPower: 12,
       maxSpeed: 14,
@@ -138,6 +142,8 @@ export const CONFIG = {
     },
     {
       name: 'Shortboard',
+      /** Shown in the shop. */
+      blurb: 'Fast and loose. Hops waves without pumping.',
       guide: 0.5,
       launchPower: 13.5,
       maxSpeed: 17,
@@ -156,6 +162,8 @@ export const CONFIG = {
     },
     {
       name: 'Pro Gun',
+      /** Shown in the shop. */
+      blurb: 'The fastest board. No guiderails: you fly where you aim.',
       guide: 0,
       launchPower: 15,
       maxSpeed: 20,
@@ -487,6 +495,53 @@ export const CONFIG = {
     strength: 1,
     /** Extra additive glow on top, 0 to 1. */
     glow: 0.4,
+  },
+
+  /** On foot: the sand, the boardwalk and the pier. */
+  walk: {
+    speed: 5.5,
+    /** Speed while holding Shift. */
+    runSpeed: 9,
+    accel: 10,
+    turnRate: 12,
+    /** Upward speed of a hop (Space). */
+    jump: 6,
+    gravity: 22,
+    /** The player can step up onto anything no more than this far above their feet (metres). */
+    stepUp: 0.9,
+    /** Water this deep or deeper is for paddling, not wading (metres). */
+    swimDepth: 0.55,
+    /** How close to the shop counter F works (metres). */
+    shopReach: 4.5,
+  },
+
+  /**
+   * The shop on the pier. Prices are in cool points.
+   * Measured in milestone 2: modest play banks about 1,100 points a minute,
+   * so 5,500 points is about five minutes.
+   */
+  shop: {
+    /** Price of each board tier, in the order of `boards` above. The first is free. */
+    boardPrices: [0, 1500, 4000, 8000],
+    /** Health: hearts for the boss fight. Start with `baseHearts`; each level adds one. */
+    baseHearts: 3,
+    healthPrices: [1000, 2500, 4500],
+    /** Weapons, used in the boss fight (milestone 4). Each is about five minutes of average play. */
+    weapons: [
+      { id: 'squirter', name: 'Super Squirter', price: 5000, blurb: 'Fast water pistol. Low damage, never stops.', damage: 1, shotsPerSecond: 6 },
+      { id: 'coconut', name: 'Coconut Cannon', price: 6000, blurb: 'Slow, heavy coconuts that hit hard.', damage: 6, shotsPerSecond: 1 },
+      { id: 'trident', name: 'Trident Launcher', price: 7000, blurb: 'Three shots at once in a spread.', damage: 2, shotsPerSecond: 2.5 },
+    ],
+    /** The boss fight. The most expensive thing in the shop. */
+    boss: { name: 'Stingray Showdown', price: 12000, blurb: 'Take on the Stingray. Beat it to unlock Mavericks.' },
+  },
+
+  /** Test switches. Leave these off for real play. */
+  debug: {
+    /** Keys 1 to 4 swap boards without buying them. */
+    boardKeys: false,
+    /** Extra cool points to start with. */
+    startPoints: 0,
   },
 
   wipeout: {
