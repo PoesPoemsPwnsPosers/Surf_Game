@@ -4,7 +4,7 @@ import * as THREE from 'three';
  * Placeholder low-poly surfer and board built from primitives.
  * Board axes: +Z is the nose, +Y is up.
  */
-export type Pose = 'prone' | 'stand' | 'air' | 'tumble';
+export type Pose = 'prone' | 'stand' | 'air' | 'tumble' | 'hangTen' | 'slide' | 'float' | 'grab';
 
 interface PoseTargets {
   bodyY: number;
@@ -16,6 +16,8 @@ interface PoseTargets {
   armRaise: number;
   headPitch: number;
   headYaw: number;
+  /** How far along the board the rider stands (positive is toward the nose). */
+  riderZ: number;
 }
 
 const POSES: Record<Pose, PoseTargets> = {
@@ -29,6 +31,7 @@ const POSES: Record<Pose, PoseTargets> = {
     armRaise: 0.25,
     headPitch: -0.75,
     headYaw: 0,
+    riderZ: 0,
   },
   stand: {
     bodyY: 0.62,
@@ -40,6 +43,7 @@ const POSES: Record<Pose, PoseTargets> = {
     armRaise: 1.15,
     headPitch: 0,
     headYaw: -1.0,
+    riderZ: 0,
   },
   air: {
     bodyY: 0.5,
@@ -51,6 +55,7 @@ const POSES: Record<Pose, PoseTargets> = {
     armRaise: 0.5,
     headPitch: 0.1,
     headYaw: -1.0,
+    riderZ: 0,
   },
   tumble: {
     bodyY: 0.9,
@@ -62,10 +67,63 @@ const POSES: Record<Pose, PoseTargets> = {
     armRaise: 2.4,
     headPitch: -0.3,
     headYaw: 0,
+    riderZ: 0,
+  },
+  // Standing tall on the nose, facing forward, arms spread.
+  hangTen: {
+    bodyY: 0.74,
+    bodyPitch: 0,
+    bodyYaw: 0,
+    torsoLean: -0.18,
+    legSpread: 0.1,
+    kneeTuck: 0,
+    armRaise: 1.45,
+    headPitch: -0.1,
+    headYaw: 0,
+    riderZ: 0.78,
+  },
+  // Low over the back foot with the tail kicked out.
+  slide: {
+    bodyY: 0.46,
+    bodyPitch: 0,
+    bodyYaw: Math.PI / 2,
+    torsoLean: 0.6,
+    legSpread: 0.9,
+    kneeTuck: 0.1,
+    armRaise: 0.75,
+    headPitch: 0,
+    headYaw: -1.0,
+    riderZ: -0.3,
+  },
+  // Light on the feet, arms wide for balance on top of the foam.
+  float: {
+    bodyY: 0.56,
+    bodyPitch: 0,
+    bodyYaw: Math.PI / 2,
+    torsoLean: 0.15,
+    legSpread: 0.7,
+    kneeTuck: 0,
+    armRaise: 1.5,
+    headPitch: 0.1,
+    headYaw: -1.0,
+    riderZ: 0,
+  },
+  // Tucked right down with a hand on the rail.
+  grab: {
+    bodyY: 0.34,
+    bodyPitch: 0,
+    bodyYaw: Math.PI / 2,
+    torsoLean: 1.0,
+    legSpread: 1.0,
+    kneeTuck: 0.55,
+    armRaise: 0.12,
+    headPitch: -0.5,
+    headYaw: -1.0,
+    riderZ: 0,
   },
 };
 
-function makeBoard(): THREE.Mesh {
+function makeBoard(): { board: THREE.Mesh; stripe: THREE.Mesh } {
   const geo = new THREE.BoxGeometry(0.62, 0.09, 2.3, 2, 1, 10);
   const pos = geo.attributes.position;
   for (let i = 0; i < pos.count; i++) {
@@ -96,7 +154,7 @@ function makeBoard(): THREE.Mesh {
   fin.position.set(0, -0.16, -0.9);
   board.add(fin);
   board.castShadow = true;
-  return board;
+  return { board, stripe };
 }
 
 export class SurferModel {
@@ -106,6 +164,11 @@ export class SurferModel {
   /** Sits between the board and the rider so the rider can stay upright on a tilted board. */
   readonly mount = new THREE.Group();
   private board: THREE.Mesh;
+  private stripe: THREE.Mesh;
+  /** Scales the board for its tier and yaws it for slides, without moving the rider. */
+  private boardSize = new THREE.Group();
+  /** Extra yaw of the board under the rider's feet (tail slides, snaps). */
+  boardYaw = 0;
   private rider = new THREE.Group();
   private body = new THREE.Group();
   private torso = new THREE.Group();
@@ -124,8 +187,11 @@ export class SurferModel {
     const shirt = new THREE.MeshStandardMaterial({ color: 0x25c2a0, flatShading: true, roughness: 0.8 });
     const hair = new THREE.MeshStandardMaterial({ color: 0xf4d35e, flatShading: true, roughness: 0.9 });
 
-    this.board = makeBoard();
-    this.boardPivot.add(this.board);
+    const made = makeBoard();
+    this.board = made.board;
+    this.stripe = made.stripe;
+    this.boardSize.add(this.board);
+    this.boardPivot.add(this.boardSize);
     this.boardPivot.add(this.mount);
     this.mount.add(this.rider);
     this.root.add(this.boardPivot);
@@ -172,6 +238,13 @@ export class SurferModel {
     }
   }
 
+  /** Resize and recolour the board for a tier. */
+  setBoard(scale: number, color: number, stripe: number): void {
+    this.boardSize.scale.setScalar(scale);
+    (this.board.material as THREE.MeshStandardMaterial).color.setHex(color);
+    (this.stripe.material as THREE.MeshStandardMaterial).color.setHex(stripe);
+  }
+
   setPose(pose: Pose): void {
     this.pose = pose;
   }
@@ -184,13 +257,15 @@ export class SurferModel {
   update(dt: number, paddling: number, crouch: number, tumble: number): void {
     this.clock += dt * (4 + paddling * 6);
     const target = POSES[this.pose];
-    const k = 1 - Math.exp(-dt * (this.pose === 'stand' ? 9 : 12));
+    const k = 1 - Math.exp(-dt * (this.pose === 'prone' || this.pose === 'tumble' ? 12 : 9));
     const c = this.cur;
     for (const key of Object.keys(c) as (keyof PoseTargets)[]) {
       c[key] += (target[key] - c[key]) * k;
     }
 
     const crouchY = this.pose === 'stand' ? crouch * 0.16 : 0;
+    this.body.position.z = c.riderZ * this.boardSize.scale.x;
+    this.boardSize.rotation.y += (this.boardYaw - this.boardSize.rotation.y) * (1 - Math.exp(-dt * 16));
     this.body.position.y = c.bodyY - crouchY;
     this.body.rotation.set(c.bodyPitch, c.bodyYaw, 0, 'YXZ');
     this.torso.rotation.x = c.torsoLean + crouch * 0.25;
@@ -220,9 +295,9 @@ export class SurferModel {
       this.rider.rotation.x += (0 - this.rider.rotation.x) * r;
       this.rider.rotation.y += (0 - this.rider.rotation.y) * r;
       this.rider.rotation.z += (0 - this.rider.rotation.z) * r;
-      this.rider.position.lerp(new THREE.Vector3(0, 0, 0), r);
+      this.rider.position.multiplyScalar(1 - r);
       this.board.rotation.set(0, 0, 0);
-      this.board.position.lerp(new THREE.Vector3(0, 0, 0), r);
+      this.board.position.multiplyScalar(1 - r);
     }
   }
 }

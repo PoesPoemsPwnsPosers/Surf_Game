@@ -1,3 +1,4 @@
+import { CONFIG } from '../config';
 import type { WaveSystem } from '../ocean/waves';
 import type { Surfer } from '../player/surfer';
 
@@ -14,6 +15,9 @@ export class Hud {
   private banner = el('banner');
   private speed = el('speed-value');
   private hint = el('hint');
+  private boardName = el('board-name');
+  private kicks = el('kicks');
+  private lastKicks = '';
   private overlay = el('overlay');
   private overlayTitle = el('overlay-title');
   private overlaySub = el('overlay-sub');
@@ -91,10 +95,14 @@ export class Hud {
         hint = '<b>WASD</b> paddle · <b>Shift</b> sprint · wait by the buoys, then <b>Space</b> on a wave';
         break;
       case 'surf':
-        hint = '<b>A D</b> carve · <b>Shift</b> pump · <b>W</b> lean in · <b>S</b> stall · <b>Space</b> jump';
+        hint =
+          '<b>A D</b> carve · <b>Shift</b> pump · <b>Space</b> jump · aim straight up the face to fly out the back<br>' +
+          'Tricks: <b>Q</b> cutback · <b>E</b> snap · <b>W+Q</b> hang ten · <b>S+Q</b> tail slide · <b>W+E</b> floater';
         break;
       case 'air':
-        hint = '<b>Q E</b> spin · <b>W S</b> flip · let go to level out';
+        hint =
+          '<b>Q E</b> spin · <b>W S</b> flip · <b>F</b> or right mouse grab · <b>A D</b> steer · <b>Space</b> air kick<br>' +
+          '<b>Shift+W</b> stretch the flight · <b>Shift+S</b> shorten it · let go to level out';
         break;
       case 'wipeout':
         hint = 'Shake it off…';
@@ -106,6 +114,20 @@ export class Hud {
     }
 
     this.speed.textContent = String(Math.round(surfer.displaySpeed * 2.237));
+    this.boardName.textContent = surfer.board.name;
+    // Air kicks: filled pips are ready, the last one shows progress.
+    const whole = Math.floor(surfer.kickCharges + 1e-6);
+    const part = Math.round((surfer.kickCharges - whole) * 10);
+    const key = `${whole}:${part}`;
+    if (key !== this.lastKicks) {
+      this.lastKicks = key;
+      let html = 'AIR KICK ';
+      for (let i = 0; i < CONFIG.air.kickMaxCharges; i++) {
+        const fill = i < whole ? 100 : i === whole ? part * 10 : 0;
+        html += `<span class="kick"><span style="width:${fill}%"></span></span>`;
+      }
+      this.kicks.innerHTML = html;
+    }
 
     if (this.bannerTimer > 0) {
       this.bannerTimer -= dt;

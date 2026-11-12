@@ -56,14 +56,15 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #8fd3ff; }
   background: rgba(13, 43, 69, 0.45); backdrop-filter: blur(3px);
 }
 .panel {
-  background: #fffaf0; color: var(--ink); border-radius: 22px; padding: 26px 34px 30px;
-  width: min(620px, 92vw); max-height: 92vh; overflow: auto;
+  background: #fffaf0; color: var(--ink); border-radius: 22px; padding: 20px 30px 24px;
+  width: min(700px, 94vw); max-height: 92vh; overflow: auto;
   box-shadow: 0 10px 0 rgba(13, 43, 69, 0.3);
   text-align: center;
 }
-.panel h1 { margin: 0; font-size: 46px; font-style: italic; color: var(--coral); letter-spacing: 0.01em; }
+.panel h1 { margin: 0; font-size: 38px; font-style: italic; color: var(--coral); letter-spacing: 0.01em; }
 .panel p { margin: 6px 0 16px; font-weight: 700; }
-.controls { text-align: left; display: grid; gap: 9px; margin-bottom: 20px; font-size: 15px; }
+.controls { text-align: left; display: grid; gap: 7px; margin-bottom: 18px; font-size: 14px; }
+.controls .group { font-weight: 900; color: var(--coral); letter-spacing: 0.06em; text-transform: uppercase; font-size: 12px; margin-top: 6px; }
 .controls > div { display: flex; align-items: center; gap: 6px; }
 .controls span { margin-left: 8px; flex: 1; }
 kbd {
@@ -79,3 +80,8 @@ button {
 button:disabled { opacity: 0.5; cursor: default; }
 button:not(:disabled):hover { filter: brightness(1.08); }
 button:not(:disabled):active { transform: translateY(3px); box-shadow: 0 2px 0 #0e7f8e; }
+
+#board { position: absolute; right: 26px; bottom: 84px; text-align: right; font-weight: 900; font-size: 18px; letter-spacing: 0.06em; }
+#kicks { font-size: 12px; letter-spacing: 0.12em; margin-top: 4px; display: flex; gap: 5px; justify-content: flex-end; align-items: center; }
+.kick { display: inline-block; width: 30px; height: 9px; border-radius: 5px; background: rgba(255, 255, 255, 0.28); overflow: hidden; }
+.kick > span { display: block; height: 100%; background: var(--sun); }

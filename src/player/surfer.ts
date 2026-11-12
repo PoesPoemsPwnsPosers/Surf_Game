@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CONFIG } from '../config';
+import { CONFIG, type BoardTuning } from '../config';
 import type { Input } from '../core/input';
 import { WaveSystem, clamp, smoothstep, type Wave, type WaveSample } from '../ocean/waves';
 import { SurferModel } from './surferModel';
@@ -9,11 +9,38 @@ export type SurferState = 'paddle' | 'surf' | 'air' | 'wipeout';
 /** Things that happened this step. The HUD, effects and (later) scoring listen to these. */
 export type SurferEvent =
   | { type: 'popUp' }
-  | { type: 'launch'; speed: number; offLip: boolean }
-  | { type: 'land'; airTime: number; spin: number; flip: number; height: number }
+  | { type: 'launch'; speed: number; offLip: boolean; seaward: boolean }
+  | {
+      type: 'land';
+      airTime: number;
+      spin: number;
+      flip: number;
+      height: number;
+      /** Seconds the grab was held, or 0. */
+      grab: number;
+      /** Flew out the back toward the ocean. */
+      seaward: boolean;
+      /** Landed on a different wave from the one it left. */
+      hopped: boolean;
+      onWave: boolean;
+      kicks: number;
+    }
+  | { type: 'trick'; name: string }
+  | { type: 'kick' }
+  | { type: 'spray'; power: number }
+  | { type: 'board'; name: string }
   | { type: 'wipeout'; reason: 'landing' | 'foam' }
   | { type: 'rideEnd'; rideTime: number }
   | { type: 'respawn' };
+
+export type WaveTrick = 'cutback' | 'snap' | 'hangTen' | 'tailSlide' | 'floater';
+const TRICK_NAMES: Record<WaveTrick, string> = {
+  cutback: 'Cutback',
+  snap: 'Snap',
+  hangTen: 'Hang ten',
+  tailSlide: 'Tail slide',
+  floater: 'Floater',
+};
 
 const TAU = Math.PI * 2;
 
@@ -79,6 +106,30 @@ export class Surfer {
   airTime = 0;
   airPeak = 0;
 
+  /** True while flying out the back toward the ocean, false for an air back onto the face. */
+  seaward = false;
+  private launchWave: Wave | null = null;
+  grabbing = false;
+  private grabTime = 0;
+  private kicksUsed = 0;
+  private airYaw = 0;
+  /** Banked air kicks. Whole numbers are usable; the fraction is progress to the next. */
+  kickCharges = CONFIG.air.kickStartCharges;
+
+  // Boards
+  boardTier = 0;
+  get board(): BoardTuning {
+    return CONFIG.boards[this.boardTier];
+  }
+
+  // Wave tricks
+  trick: WaveTrick | null = null;
+  private trickTime = 0;
+  private trickSide = 1;
+  private trickCounted = false;
+  private trickCooldown = 0;
+  private trickKey = 'KeyQ';
+
   private foamTimer = 0;
   private tumble = 0;
   private landSquash = 0;
@@ -89,6 +140,15 @@ export class Surfer {
 
   constructor(private waves: WaveSystem) {
     this.reset();
+    this.setBoard(CONFIG.startingBoardTier);
+  }
+
+  /** Switch to another board tier (0 is the starter). */
+  setBoard(tier: number): void {
+    this.boardTier = clamp(Math.round(tier), 0, CONFIG.boards.length - 1);
+    const b = this.board;
+    this.model.setBoard(b.scale, b.color, b.stripe);
+    this.events.push({ type: 'board', name: b.name });
   }
 
   reset(): void {
@@ -107,6 +167,14 @@ export class Surfer {
   }
   get forwardZ(): number {
     return Math.cos(this.heading);
+  }
+
+  /** Flight velocity over the water while airborne. */
+  get flightVX(): number {
+    return this.airVX;
+  }
+  get flightVZ(): number {
+    return this.airVZ + this.airFrame;
   }
 
   /** Speed over the water, for the HUD. */
@@ -232,9 +300,55 @@ export class Surfer {
     return front * rear * smoothstep(0.3, 1.0, ws.localAmp);
   }
 
+  /** Is the lip here too big to fly over? Tall peaks and the pitching pocket next to the whitewater are. */
+  private lipOverwhelming(ws: WaveSample): boolean {
+    const A = CONFIG.air;
+    if (ws.localAmp > A.lipOverwhelmHeight) return true;
+    const w = ws.wave;
+    if (w.brokenHalfWidth >= 0) {
+      const fromFoam = Math.abs(this.pos.x - w.peakX) - w.brokenHalfWidth;
+      if (fromFoam >= 0 && fromFoam < A.pocketWidth) return true;
+    }
+    return false;
+  }
+
+  private startTrick(t: WaveTrick): void {
+    this.trick = t;
+    this.trickTime = 0;
+    this.trickCounted = false;
+    this.trickSide = this.forwardX >= 0 ? 1 : -1;
+    this.trickKey = t === 'snap' || t === 'floater' ? 'KeyE' : 'KeyQ';
+    if (t === 'hangTen') this.model.setPose('hangTen');
+    else if (t === 'tailSlide') this.model.setPose('slide');
+    else if (t === 'floater') this.model.setPose('float');
+  }
+
+  /** The trick has been held or carried far enough to count: announce it and bank a little air kick. */
+  private countTrick(): void {
+    if (this.trickCounted || !this.trick) return;
+    this.trickCounted = true;
+    this.addKick(CONFIG.air.kickPerWaveTrick);
+    this.events.push({ type: 'trick', name: TRICK_NAMES[this.trick] });
+  }
+
+  private endTrick(): void {
+    const K = CONFIG.tricks;
+    if (this.trick === 'floater' && this.trickCounted) this.speed += K.floater.speedGain;
+    this.trick = null;
+    this.trickCooldown = K.cooldown;
+    this.model.boardYaw = 0;
+    if (this.state === 'surf') this.model.setPose('stand');
+  }
+
+  private addKick(amount: number): void {
+    this.kickCharges = Math.min(CONFIG.air.kickMaxCharges, this.kickCharges + amount);
+  }
+
   private stepSurf(dt: number, input: Input): void {
     const S = CONFIG.surf;
     const A = CONFIG.air;
+    const K = CONFIG.tricks;
+    const B = this.board;
     const T = this.waves.tuning;
     this.rideTime += dt;
 
@@ -242,18 +356,86 @@ export class Surfer {
     this.carry = ws ? this.carryAt(ws) : 0;
     const near = ws ? this.nearWave(ws) : 0;
 
-    // Steering. A turns left, D turns right, as seen from behind the board.
-    const steer = input.axis('KeyD', 'KeyA');
-    let turnTarget = steer * S.turnRate;
-    if (steer === 0 && near > 0.1 && Math.abs(this.forwardX) > 0.15) {
+    // ---- Wave tricks: Q cutback, E snap, W+Q hang ten, S+Q tail slide, W+E floater.
+    this.trickCooldown = Math.max(0, this.trickCooldown - dt);
+    if (!this.trick && this.trickCooldown <= 0 && this.carry > 0.4 && this.stateTime > 0.3) {
+      const w = input.isDown('KeyW');
+      const s = input.isDown('KeyS');
+      if (input.wasPressed('KeyQ')) this.startTrick(w ? 'hangTen' : s ? 'tailSlide' : 'cutback');
+      else if (input.wasPressed('KeyE')) this.startTrick(w ? 'floater' : 'snap');
+    }
+    const trick = this.trick;
+    if (trick) this.trickTime += dt;
+    const tt = this.trickTime;
+    const side = trick ? this.trickSide : this.forwardX > 0 ? 1 : -1;
+    const trimHeading = side * (Math.PI / 2);
+
+    // ---- Steering. A turns left, D turns right, as seen from behind the board.
+    const steer = trick ? 0 : input.axis('KeyD', 'KeyA');
+    let turnTarget = steer * B.turnRate;
+    let trimLine = S.trimLine;
+    let accelBonus = 0;
+    let capBoost = 1;
+    let extraDrag = 0;
+    let holdOver = false;
+    if (trick === 'cutback') {
+      const C = K.cutback;
+      // Swing down the face and back toward the whitewater, then rebound to the trim line.
+      const goal = tt < C.duration * 0.5 ? -side * C.swing : trimHeading;
+      turnTarget = clamp(shortestAngle(this.heading, goal) * 9, -C.turnRate, C.turnRate);
+      if (tt > C.duration * 0.5) this.countTrick();
+      if (tt > C.duration) holdOver = true;
+    } else if (trick === 'snap') {
+      const N = K.snap;
+      if (tt < N.climbTime) {
+        turnTarget = clamp(shortestAngle(this.heading, side * (Math.PI / 2 + N.angle)) * 10, -N.climbTurnRate, N.climbTurnRate);
+      } else {
+        if (!this.trickCounted) {
+          this.countTrick();
+          this.speed += N.speedGain;
+          this.events.push({ type: 'spray', power: 1 });
+        }
+        turnTarget = clamp(shortestAngle(this.heading, side * (Math.PI / 2 - N.angle)) * 12, -N.whipTurnRate, N.whipTurnRate);
+        // The tail whips round further than the board's path does.
+        const u = (tt - N.climbTime) / N.whipTime;
+        this.model.boardYaw = -side * 0.9 * Math.sin(Math.min(1, u) * Math.PI);
+        if (u >= 1) holdOver = true;
+      }
+    } else if (trick === 'hangTen') {
+      const H = K.hangTen;
+      accelBonus = H.accel;
+      capBoost = H.topSpeedBoost;
+      if (tt > H.minTime) this.countTrick();
+      if (tt > H.maxTime || !input.isDown(this.trickKey)) holdOver = true;
+    } else if (trick === 'tailSlide') {
+      const L = K.tailSlide;
+      extraDrag = L.drag;
+      this.model.boardYaw = side * L.angle * smoothstep(0, 0.18, tt);
+      if (tt > L.minTime) this.countTrick();
+      if (tt > L.maxTime || !input.isDown(this.trickKey)) holdOver = true;
+    } else if (trick === 'floater') {
+      const F = K.floater;
+      trimLine = F.line;
+      if (ws) {
+        // Pull the board up onto the crest and hold it there.
+        const want = clamp((F.line * ws.wave.faceWidth - ws.ahead) * 5, -F.climbSpeed, F.climbSpeed);
+        this.pos.z += want * dt;
+        if (Math.abs(ws.ahead - F.line * ws.wave.faceWidth) < 1.2 && tt > F.minTime) this.countTrick();
+      }
+      if (tt > F.maxTime || !input.isDown(this.trickKey)) holdOver = true;
+    }
+    if (trick && (holdOver || this.carry < 0.15)) this.endTrick();
+
+    const handsOff = steer === 0 && trick !== 'cutback' && trick !== 'snap';
+    if (handsOff && near > 0.1 && Math.abs(this.forwardX) > 0.15) {
       // Hands off: settle into a trim line along the wave.
       // Aim a little up or down the face to drift back to the sweet spot.
-      const side = this.forwardX > 0 ? 1 : -1;
-      const off = ws ? clamp((ws.ahead / ws.wave.faceWidth - S.trimLine) * 0.7, -0.45, 0.45) : 0;
+      const off = ws ? clamp((ws.ahead / ws.wave.faceWidth - trimLine) * 0.7, -0.45, 0.45) : 0;
       const along = side * (Math.PI / 2 + off * this.carry);
       turnTarget = clamp(shortestAngle(this.heading, along) * 3, -S.autoTrim, S.autoTrim) * near;
     }
-    this.turnVel += (turnTarget - this.turnVel) * (1 - Math.exp(-dt * S.turnResponse));
+    const response = trick === 'cutback' || trick === 'snap' ? 22 : S.turnResponse;
+    this.turnVel += (turnTarget - this.turnVel) * (1 - Math.exp(-dt * response));
     this.heading += this.turnVel * dt;
     const fx = this.forwardX;
     const fz = this.forwardZ;
@@ -266,18 +448,22 @@ export class Surfer {
 
     this.pumping = input.isDown('ShiftLeft') || input.isDown('ShiftRight');
     let accel = -S.slopeGravity * slopeAlong * (slopeAlong > 0 ? S.climbEase : 1);
-    accel += S.trimAccel * Math.min(1, slopeMag) * Math.abs(fx) * this.carry;
-    if (this.pumping) accel += S.pumpAccel * (0.3 + 0.7 * near);
-    if (input.isDown('KeyW')) accel += S.leanAccel * near;
-    let drag = S.drag + (1 - near) * S.offWaveDrag;
-    if (input.isDown('KeyS')) drag += S.brakeDrag;
+    accel += B.trimAccel * Math.min(1, slopeMag) * Math.abs(fx) * this.carry;
+    if (this.pumping) accel += B.pumpAccel * (0.3 + 0.7 * near);
+    if (input.isDown('KeyW') && !trick) accel += S.leanAccel * near;
+    accel += accelBonus;
+    let drag = S.drag + (1 - near) * S.offWaveDrag + extraDrag;
+    if (input.isDown('KeyS') && !trick) drag += S.brakeDrag;
     accel -= drag * this.speed;
     this.speed = Math.max(0, this.speed + accel * dt);
-    const cap = this.pumping ? S.pumpMaxSpeed : S.maxSpeed;
+    const cap = (this.pumping ? B.pumpMaxSpeed : B.maxSpeed) * capBoost;
     if (this.speed > cap) this.speed -= (this.speed - cap) * Math.min(1, 3 * dt);
 
+    // Riding flat out slowly earns an air kick.
+    if (this.carry > 0.5 && this.speed > B.maxSpeed * A.kickFastFraction) this.addKick(A.kickPerSecondFast * dt);
+
     // A stalled board slides down the face and swings its nose downhill.
-    if (this.speed < S.slideSpeed && this.carry > 0.3 && slopeMag > 0.05) {
+    if (this.speed < S.slideSpeed && this.carry > 0.3 && slopeMag > 0.05 && !trick) {
       const stall = 1 - this.speed / S.slideSpeed;
       this.pos.x -= gx * S.slideRate * stall * dt;
       this.pos.z -= gz * S.slideRate * stall * dt;
@@ -292,7 +478,10 @@ export class Surfer {
     const surfaceY = this.waves.height(this.pos.x, this.pos.z);
     const surfaceVY = (surfaceY - this.pos.y) / dt;
     const offLip =
-      this.vy > A.minLaunchSpeed && this.vy - A.gravity * A.lipStick * dt > surfaceVY + 0.1 && this.stateTime > 0.15;
+      !this.trick &&
+      this.vy > A.minLaunchSpeed &&
+      this.vy - A.gravity * A.lipStick * dt > surfaceVY + 0.1 &&
+      this.stateTime > 0.15;
     const jump = input.wasPressed('Space') && this.stateTime > 0.12;
     if (offLip || jump) {
       let vy = Math.max(this.vy, 0);
@@ -301,17 +490,20 @@ export class Surfer {
         const rise = clamp(surfaceY / (T.height * 0.8), 0, 1);
         vy += A.jumpImpulse + A.jumpSpeedBoost * this.speed * rise;
       }
-      vy = Math.min(vy, A.maxLaunchSpeed);
+      vy = Math.min(vy, B.launchPower);
+      if (this.trick) this.endTrick();
       this.launch(vy, offLip, ws);
       return;
     }
     this.pos.y = surfaceY;
     this.vy = surfaceVY;
 
-    // Sitting in the whitewater at the crest for too long ends badly.
-    if (ws && ws.foam > 0.6 && ws.localAmp > 0.8 && ws.ahead > -2.5 && ws.ahead < ws.wave.faceWidth * 0.8) {
+    // Sitting in the whitewater at the crest for too long ends badly. A floater is the exception.
+    const inFoam =
+      ws && ws.foam > 0.6 && ws.localAmp > 0.8 && ws.ahead > -2.5 && ws.ahead < ws.wave.faceWidth * 0.8;
+    if (inFoam && this.trick !== 'floater') {
       this.foamTimer += dt;
-      if (this.foamTimer > S.foamGrace) {
+      if (this.foamTimer > B.foamGrace) {
         this.wipeout('foam');
         return;
       }
@@ -327,10 +519,26 @@ export class Surfer {
   }
 
   private launch(vy: number, offLip: boolean, ws: WaveSample | null): void {
-    this.airVX = this.speed * this.forwardX;
-    this.airVZ = this.speed * this.forwardZ;
-    this.airFrame = this.waves.tuning.speed * this.carry;
-    this.airWave = ws && this.carry > 0.3 ? ws.wave : null;
+    const A = CONFIG.air;
+    const T = this.waves.tuning;
+    const fx = this.forwardX;
+    const fz = this.forwardZ;
+    // Pointed out to sea over a lip that is not too big: fly out the back.
+    // Otherwise the lip throws the board back toward the beach, onto the face.
+    this.seaward = !!ws && this.carry > 0.3 && fz < -A.seawardAim && !this.lipOverwhelming(ws);
+    this.launchWave = ws ? ws.wave : null;
+    if (this.seaward) {
+      // From here on airVX/airVZ are speeds over the water, not relative to the wave.
+      this.airVX = this.speed * fx;
+      this.airVZ = this.speed * fz * A.seawardFling + T.speed * this.carry * A.seawardCarry;
+      this.airFrame = 0;
+      this.airWave = null;
+    } else {
+      this.airVX = this.speed * fx;
+      this.airVZ = this.speed * fz;
+      this.airFrame = T.speed * this.carry;
+      this.airWave = ws && this.carry > 0.3 ? ws.wave : null;
+    }
     this.launchSpeed = this.speed;
     this.launchY = this.pos.y;
     this.vy = vy;
@@ -340,21 +548,84 @@ export class Surfer {
     this.flipVel = 0;
     this.airTime = 0;
     this.airPeak = 0;
+    this.grabTime = 0;
+    this.grabbing = false;
+    this.kicksUsed = 0;
     this.setState('air');
     this.model.setPose('air');
-    this.events.push({ type: 'launch', speed: this.speed, offLip });
+    this.events.push({ type: 'launch', speed: this.speed, offLip, seaward: this.seaward });
   }
 
   private stepAir(dt: number, input: Input): void {
     const A = CONFIG.air;
+    const B = this.board;
     const T = this.waves.tuning;
     this.airTime += dt;
     this.rideTime += dt;
     this.vy -= A.gravity * dt;
     this.pos.y += this.vy * dt;
     this.airPeak = Math.max(this.airPeak, this.pos.y - this.launchY);
+    const shift = input.isDown('ShiftLeft') || input.isDown('ShiftRight');
 
-    // Arcade help: drift back over the face of the wave we launched from.
+    // A and D bend the flight path.
+    const steer = input.axis('KeyD', 'KeyA');
+    if (steer !== 0) {
+      const a = steer * B.airSteer * dt;
+      const c = Math.cos(a);
+      const s = Math.sin(a);
+      const vx = this.airVX * c + this.airVZ * s;
+      const vz = this.airVZ * c - this.airVX * s;
+      this.airVX = vx;
+      this.airVZ = vz;
+    }
+    // Shift + W / S: lean forward or back to stretch or shorten the flight (no flip).
+    if (shift) {
+      const lean = input.axis('KeyS', 'KeyW');
+      const v = Math.hypot(this.airVX, this.airVZ);
+      if (lean !== 0 && v > 0.01) {
+        const base = Math.max(this.launchSpeed, 6);
+        const next = clamp(v + lean * B.airDrift * dt, Math.min(v, base * A.driftMinSpeed), Math.max(v, base * A.driftMaxSpeed));
+        this.airVX *= next / v;
+        this.airVZ *= next / v;
+      }
+    }
+
+    // Flying out the back: ease off a flight that would sail past the next wave, so it lands on the face.
+    if (this.seaward && !shift && A.hopAssist > 0 && this.airVZ < 0) {
+      let next: Wave | null = null;
+      for (const cand of this.waves.waves) {
+        if (cand === this.launchWave || cand.crestZ > this.pos.z + 2 || cand.amp < 1.5) continue;
+        if (!next || cand.crestZ > next.crestZ) next = cand;
+      }
+      if (next) {
+        const drop = this.pos.y - next.amp * 0.4;
+        const tLand = (this.vy + Math.sqrt(Math.max(0, this.vy * this.vy + 2 * A.gravity * drop))) / A.gravity;
+        if (tLand > 0.15) {
+          const targetZ = next.crestZ + T.speed * tLand + next.faceWidth * 0.8;
+          const need = (targetZ - this.pos.z) / tLand;
+          // `need` and airVZ are both negative (out to sea). Only ever slow down.
+          if (need > this.airVZ) {
+            const nextVZ = Math.min(need, this.airVZ + A.hopAssist * dt);
+            this.airVZ = Math.min(nextVZ, -0.5);
+          }
+        }
+      }
+    }
+
+    // Space: air kick, if one is banked.
+    if (input.wasPressed('Space') && this.kickCharges >= 1 && this.airTime > 0.15) {
+      this.kickCharges -= 1;
+      this.kicksUsed++;
+      this.vy = Math.max(this.vy + A.kickUp, A.kickUp * 0.75);
+      const v = Math.hypot(this.airVX, this.airVZ);
+      if (v > 0.5) {
+        this.airVX *= (v + A.kickForward) / v;
+        this.airVZ *= (v + A.kickForward) / v;
+      }
+      this.events.push({ type: 'kick' });
+    }
+
+    // Arcade help for airs off a big lip: drift back over the face of the wave we launched from.
     const w = this.airWave;
     if (w && this.waves.waves.includes(w) && w.amp > 0.6) {
       const ahead = this.pos.z - w.crestZ;
@@ -367,7 +638,7 @@ export class Surfer {
 
     // Tricks: Q/E spin, W/S flip. Let go and the board levels itself out.
     const spinIn = input.axis('KeyE', 'KeyQ');
-    const flipIn = input.axis('KeyS', 'KeyW');
+    const flipIn = shift ? 0 : input.axis('KeyS', 'KeyW');
     const k = 1 - Math.exp(-dt * A.rotationResponse);
     const spinTarget =
       spinIn !== 0 ? spinIn * A.spinRate : clamp(-offNearest(this.spin, Math.PI) * 5, -A.settleRate, A.settleRate);
@@ -378,40 +649,99 @@ export class Surfer {
     this.spin += this.spinVel * dt;
     this.flip += this.flipVel * dt;
 
+    // F or the right mouse button: grab the rail.
+    const grab = input.isDown('KeyF') || input.rightDown;
+    if (grab !== this.grabbing) {
+      this.grabbing = grab;
+      this.model.setPose(grab ? 'grab' : 'air');
+    }
+    if (grab) this.grabTime += dt;
+
     const surfaceY = this.waves.height(this.pos.x, this.pos.z);
     if (this.pos.y <= surfaceY && this.vy < 0) {
       this.pos.y = surfaceY;
       const spinErr = Math.abs(offNearest(this.spin, Math.PI));
       const flipErr = Math.abs(offNearest(this.flip, TAU));
-      if (spinErr > A.spinLandTolerance || flipErr > A.flipLandTolerance) {
+      if (spinErr > B.spinLandTolerance || flipErr > B.flipLandTolerance) {
         this.wipeout('landing');
         return;
       }
       // Clean landing: point back down the face and keep the speed.
-      const vx = this.airVX;
-      const vz = Math.max(Math.abs(this.airVZ), Math.abs(vx) * 0.3, 2);
+      const ws = this.waves.waveAt(this.pos.x, this.pos.z, this.sample);
+      const onWave = !!ws && this.carryAt(ws) > 0.3;
+      const hopped = onWave && this.launchWave !== null && ws!.wave !== this.launchWave;
+      let vx = this.airVX;
+      if (Math.abs(vx) < 2.5) {
+        // Came in nearly straight: pick a side so the board trims instead of running out onto the flat.
+        const away = ws ? Math.sign(this.pos.x - ws.wave.peakX) || 1 : 1;
+        vx = (Math.abs(vx) > 0.4 ? Math.sign(vx) : away) * 2.5;
+      }
+      const vz = Math.max(Math.abs(this.airVZ) * (this.seaward ? 0.35 : 1), Math.abs(vx) * 0.3, 2);
       this.heading = Math.atan2(vx, vz);
-      this.speed = Math.max(Math.hypot(this.airVX, this.airVZ), this.launchSpeed) * A.landSpeedKeep;
+      const flown = this.seaward ? this.launchSpeed : Math.max(Math.hypot(this.airVX, this.airVZ), this.launchSpeed);
+      this.speed = flown * A.landSpeedKeep;
+      const grabbed = this.grabTime >= A.grabMinTime;
+      const tricked = Math.abs(this.spin) > Math.PI * 0.75 || Math.abs(this.flip) > Math.PI * 1.5 || grabbed;
+      if (tricked) this.addKick(A.kickPerAirTrick);
       this.events.push({
         type: 'land',
         airTime: this.airTime,
         spin: this.spin,
         flip: this.flip,
         height: this.airPeak,
+        grab: grabbed ? this.grabTime : 0,
+        seaward: this.seaward,
+        hopped,
+        onWave,
+        kicks: this.kicksUsed,
       });
       this.spin = 0;
       this.flip = 0;
       this.vy = 0;
       this.turnVel = 0;
       this.landSquash = 1;
+      this.grabbing = false;
+      this.seaward = false;
+      this.trickCooldown = 0.2;
       this.setState('surf');
       this.model.setPose('stand');
     }
   }
 
+  /**
+   * Where the current flight will come down if nothing changes. Used for the
+   * landing marker. Returns false when not airborne.
+   */
+  predictLanding(out: THREE.Vector3): boolean {
+    if (this.state !== 'air') return false;
+    const g = CONFIG.air.gravity;
+    const c = this.waves.tuning.speed;
+    const vz = this.airVZ + this.airFrame;
+    let x = this.pos.x;
+    let y = this.pos.y;
+    let z = this.pos.z;
+    let vy = this.vy;
+    const h = 0.04;
+    for (let t = h; t < 6; t += h) {
+      vy -= g * h;
+      y += vy * h;
+      x += this.airVX * h;
+      z += vz * h;
+      // The waves will have rolled toward the beach by then; look that far back along their path.
+      const surface = this.waves.height(x, z - c * t);
+      if (y <= surface && vy < 0) {
+        out.set(x, surface, z);
+        return true;
+      }
+    }
+    out.set(x, 0, z);
+    return true;
+  }
+
   // ------------------------------------------------------- wipeout and reset
 
   private wipeout(reason: 'landing' | 'foam'): void {
+    if (this.trick) this.endTrick();
     this.setState('wipeout');
     this.model.setPose('tumble');
     this.tumble = 0;
@@ -420,6 +750,8 @@ export class Surfer {
     this.paddleVZ = (this.speed * this.forwardZ + this.carry * this.waves.tuning.speed) * 0.4;
     this.speed = 0;
     this.carry = 0;
+    this.seaward = false;
+    this.grabbing = false;
     this.events.push({ type: 'wipeout', reason });
   }
 
@@ -450,6 +782,7 @@ export class Surfer {
   }
 
   private endRide(): void {
+    if (this.trick) this.endTrick();
     this.paddleVX = this.speed * this.forwardX;
     this.paddleVZ = this.speed * this.forwardZ;
     this.carry = 0;
@@ -480,12 +813,24 @@ export class Surfer {
     }
     this.normal.lerp(this.tmpN, 1 - Math.exp(-dt * 14)).normalize();
 
-    const leanTarget = this.state === 'surf' ? this.turnVel / CONFIG.surf.turnRate : 0;
+    const leanTarget = this.state === 'surf' ? clamp(this.turnVel / this.board.turnRate, -1.4, 1.4) : 0;
     this.lean += (leanTarget - this.lean) * (1 - Math.exp(-dt * 8));
     this.landSquash = Math.max(0, this.landSquash - dt * 3);
 
+    // In the air the board points along the flight, plus any spin.
+    let yaw = this.heading + this.spin;
+    if (this.state === 'air') {
+      const vz = this.airVZ + this.airFrame;
+      if (Math.hypot(this.airVX, vz) > 1) {
+        this.airYaw += shortestAngle(this.airYaw, Math.atan2(this.airVX, vz)) * (1 - Math.exp(-dt * 6));
+      }
+      yaw = this.airYaw + this.spin;
+    } else {
+      this.airYaw = this.heading;
+    }
+
     this.qAlign.setFromUnitVectors(this.up, this.normal);
-    this.euler.set(this.flip, this.heading + this.spin, -this.lean * 0.5, 'YXZ');
+    this.euler.set(this.flip, yaw, -this.lean * 0.5, 'YXZ');
     this.qLocal.setFromEuler(this.euler);
     this.model.boardPivot.quaternion.copy(this.qAlign).multiply(this.qLocal);
     // The board tilts with the wave face, but a standing rider stays closer to upright.
@@ -502,7 +847,11 @@ export class Surfer {
     this.model.root.position.y += 0.06;
 
     const paddling = this.state === 'paddle' ? clamp(this.speed / CONFIG.paddle.speed, 0, 1.4) : 0;
-    const crouch = clamp((this.pumping && this.state === 'surf' ? 0.6 : 0) + this.landSquash + Math.abs(this.lean) * 0.3, 0, 1);
+    const crouch = clamp(
+      (this.pumping && this.state === 'surf' ? 0.6 : 0) + this.landSquash + Math.abs(this.lean) * 0.3,
+      0,
+      1,
+    );
     this.model.update(dt, paddling, crouch, this.tumble);
   }
 }

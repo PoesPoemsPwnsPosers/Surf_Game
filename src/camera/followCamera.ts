@@ -50,7 +50,17 @@ export class FollowCamera {
 
     this.pitch = Math.min(0.9, Math.max(-0.12, this.pitch + input.mouseDY * C.mouseSensitivity));
 
-    if (riding) {
+    const flyingOut = surfer.state === 'air' && surfer.seaward;
+    if (flyingOut) {
+      // Flying out to sea: swing in behind the flight so the landing is in view.
+      const targetYaw = Math.atan2(-surfer.flightVX, -surfer.flightVZ);
+      this.mouseYaw -= input.mouseDX * C.mouseSensitivity;
+      this.mouseYaw *= Math.exp(-dt * 1.2);
+      this.yaw += shortestAngle(this.yaw, targetYaw + this.mouseYaw) * (1 - Math.exp(-dt * C.seawardYawFollow));
+      this.lineDir *= Math.exp(-dt * 2);
+      dist = C.distance + C.airPullBack;
+      height = C.height + C.seawardHeight;
+    } else if (riding) {
       // Which way along the wave are we going? Saturates quickly so the camera commits to a side.
       const along = Math.max(-1, Math.min(1, surfer.forwardX * 1.7));
       this.lineDir += (along - this.lineDir) * (1 - Math.exp(-dt * 3));
@@ -80,6 +90,11 @@ export class FollowCamera {
     );
     const ahead = riding ? C.lookAhead : 0;
     this.lookTarget.set(p.x + surfer.forwardX * ahead * Math.abs(this.lineDir), p.y + 1.3, p.z);
+    if (flyingOut) {
+      // Look ahead along the flight and a little down, toward the water we are heading for.
+      const v = Math.hypot(surfer.flightVX, surfer.flightVZ) || 1;
+      this.lookTarget.set(p.x + (surfer.flightVX / v) * 7, p.y - 0.5, p.z + (surfer.flightVZ / v) * 7);
+    }
 
     if (!this.started) {
       this.pos.copy(this.want);
@@ -102,7 +117,7 @@ export class FollowCamera {
     }
     this.camera.lookAt(this.look);
 
-    const speedT = Math.min(1, surfer.displaySpeed / (CONFIG.surf.pumpMaxSpeed + CONFIG.waves.venice.speed));
+    const speedT = Math.min(1, surfer.displaySpeed / (surfer.board.pumpMaxSpeed + waves.tuning.speed));
     const fov = C.fov + C.speedFov * (riding ? speedT : 0);
     if (Math.abs(fov - this.camera.fov) > 0.05) {
       this.camera.fov += (fov - this.camera.fov) * (1 - Math.exp(-dt * 4));

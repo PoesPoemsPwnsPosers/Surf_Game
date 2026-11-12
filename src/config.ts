@@ -66,6 +66,94 @@ export const CONFIG = {
     startZ: -70,
   },
 
+  /** Which board the player starts on: an index into `boards` below (0 is the starter). */
+  startingBoardTier: 0,
+
+  /**
+   * The boards, slowest to fastest. Each tier is bigger, faster and more forgiving.
+   * Until the shop exists (milestone 3), number keys 1 to 4 swap boards in the game.
+   */
+  boards: [
+    {
+      name: 'Foamie',
+      /** Fastest upward speed a launch can have on this board. Sets how big its airs are. */
+      launchPower: 10.5,
+      /** Top speed along the board without pumping, and while pumping. */
+      maxSpeed: 11.5,
+      pumpMaxSpeed: 15.5,
+      /** Thrust from holding Shift. */
+      pumpAccel: 6,
+      /** Free speed from trimming along a steep face. */
+      trimAccel: 6,
+      /** How fast the board turns (radians per second). */
+      turnRate: 2.3,
+      /** A spin lands within this angle of forward or backward; a flip within this angle of flat (radians). */
+      spinLandTolerance: 1.0,
+      flipLandTolerance: 0.95,
+      /** Seconds the board survives in the whitewater at the crest. */
+      foamGrace: 1.1,
+      /** How fast the flight path can be steered with A and D (radians per second). */
+      airSteer: 1.1,
+      /** How hard Shift + W / S speeds up or slows the flight (m/s per second). */
+      airDrift: 5,
+      /** Size of the board model. */
+      scale: 0.86,
+      color: 0x7ed8f6,
+      stripe: 0xffffff,
+    },
+    {
+      name: 'Fish',
+      launchPower: 12,
+      maxSpeed: 14,
+      pumpMaxSpeed: 19,
+      pumpAccel: 7.5,
+      trimAccel: 7.5,
+      turnRate: 2.5,
+      spinLandTolerance: 1.08,
+      flipLandTolerance: 1.05,
+      foamGrace: 1.3,
+      airSteer: 1.4,
+      airDrift: 6.5,
+      scale: 1.0,
+      color: 0xfff4d6,
+      stripe: 0xff4f6d,
+    },
+    {
+      name: 'Shortboard',
+      launchPower: 13.5,
+      maxSpeed: 17,
+      pumpMaxSpeed: 23,
+      pumpAccel: 9,
+      trimAccel: 9,
+      turnRate: 2.7,
+      spinLandTolerance: 1.18,
+      flipLandTolerance: 1.2,
+      foamGrace: 1.5,
+      airSteer: 1.7,
+      airDrift: 8,
+      scale: 1.14,
+      color: 0xffd23f,
+      stripe: 0x0d2b45,
+    },
+    {
+      name: 'Pro Gun',
+      launchPower: 15,
+      maxSpeed: 20,
+      pumpMaxSpeed: 27,
+      pumpAccel: 11,
+      trimAccel: 10.5,
+      turnRate: 2.9,
+      spinLandTolerance: 1.3,
+      flipLandTolerance: 1.4,
+      foamGrace: 1.8,
+      airSteer: 2.0,
+      airDrift: 9.5,
+      scale: 1.3,
+      color: 0xff5a5f,
+      stripe: 0xffd23f,
+    },
+  ],
+
   /** Wave settings for each beach. Later beaches add their own entry. */
   waves: {
     venice: {
@@ -121,22 +209,12 @@ export const CONFIG = {
     autoTrim: 1.1,
     /** Where on the face a hands-off board settles, in face widths in front of the crest. */
     trimLine: 0.8,
-    /** Free speed from trimming along a steep face. */
-    trimAccel: 9,
     /** Water drag on the board (per second). */
     drag: 0.42,
     /** Extra drag while holding S to stall. */
     brakeDrag: 1.6,
-    /** Thrust from holding Shift to pump. */
-    pumpAccel: 9,
     /** Thrust from holding W to lean forward. */
     leanAccel: 2.5,
-    /** Top speed along the board without pumping. */
-    maxSpeed: 17,
-    /** Top speed along the board while pumping. */
-    pumpMaxSpeed: 23,
-    /** How fast the board turns (radians per second). */
-    turnRate: 2.7,
     /** How quickly the turn reaches full rate (per second). */
     turnResponse: 9,
     /** Below this speed the board slides down the face and turns downhill. */
@@ -147,8 +225,6 @@ export const CONFIG = {
     offWaveDrag: 1.4,
     /** The ride ends when the board is off the wave and slower than this. */
     endSpeed: 2.2,
-    /** Seconds the player can sit in the whitewater at the crest before it eats them. */
-    foamGrace: 1.1,
   },
 
   air: {
@@ -160,8 +236,6 @@ export const CONFIG = {
     jumpSpeedBoost: 0.42,
     /** Multiplier on upward speed when the board flies off the lip on its own. */
     lipLaunchBoost: 1.5,
-    /** Fastest upward speed any launch can have. Caps how high big airs go. */
-    maxLaunchSpeed: 15,
     /** Smallest upward speed that counts as a launch. */
     minLaunchSpeed: 2.6,
     /** How easily the board leaves the lip. 1 is real gravity; lower launches more readily. */
@@ -176,12 +250,111 @@ export const CONFIG = {
     settleRate: 3.2,
     /** Pull that brings the surfer back over the wave face while airborne. */
     waveMagnet: 1.6,
-    /** A spin lands if the board is within this angle of pointing forward or backward. */
-    spinLandTolerance: 1.0,
-    /** A flip lands if the board is within this angle of flat. */
-    flipLandTolerance: 0.9,
     /** Fraction of speed kept on landing. */
     landSpeedKeep: 0.92,
+
+    // --- Flying out the back, toward the ocean ---
+    /**
+     * How squarely the board must point out to sea at take-off to fly out the back
+     * instead of dropping back onto the face. 1 is dead straight, 0.7 is within 45 degrees.
+     */
+    seawardAim: 0.8,
+    /** A lip taller than this is "overwhelming": it always throws the surfer back toward the beach. */
+    lipOverwhelmHeight: 5.35,
+    /** So is the pitching section this close to where the whitewater is peeling. */
+    pocketWidth: 8,
+    /** Extra speed out to sea given to a launch out the back (multiplier on board speed). */
+    seawardFling: 1.1,
+    /** How much of the wave's push toward the beach a launch out the back keeps (0 to 1). Lower flies further out. */
+    seawardCarry: 0.55,
+
+    /**
+     * Landing help when flying out the back: if the flight would overshoot the next wave,
+     * it is slowed at up to this rate (m/s per second) so it comes down on the face.
+     * It never speeds a flight up, and holding Shift turns it off. 0 disables it.
+     */
+    hopAssist: 9,
+
+    // --- Air kick (Space in the air) ---
+    /** Upward speed added by an air kick. */
+    kickUp: 7.5,
+    /** Forward speed added by an air kick. */
+    kickForward: 4,
+    /** Most kicks that can be stored. */
+    kickMaxCharges: 2,
+    /** Kicks the player starts with. */
+    kickStartCharges: 1,
+    /** Charge earned by landing an air with at least one spin, flip or grab. */
+    kickPerAirTrick: 0.5,
+    /** Charge earned by finishing a wave trick. */
+    kickPerWaveTrick: 0.25,
+    /** Charge earned per second of pumping beyond the board's normal top speed. */
+    kickPerSecondFast: 0.1,
+    /** "Beyond top speed" means above this multiple of the board's unpumped top speed. */
+    kickFastFraction: 1.08,
+
+    // --- Shift in the air: lean to speed up or slow down instead of flipping ---
+    /** Slowest and fastest the surfer can make the flight with Shift + S / W (multiples of launch speed). */
+    driftMinSpeed: 0.35,
+    driftMaxSpeed: 1.5,
+    /** A grab has to be held this long to count. */
+    grabMinTime: 0.35,
+  },
+
+  /**
+   * Wave tricks, done while the board trims on its own.
+   * Q cutback, E snap, W+Q hang ten (hold), S+Q tail slide (hold), W+E floater (hold).
+   */
+  tricks: {
+    /** Seconds after one trick before the next can start. */
+    cooldown: 0.25,
+    cutback: {
+      /** Seconds for the whole figure. */
+      duration: 1.15,
+      /** How fast the board swings (radians per second). */
+      turnRate: 5.6,
+      /** How far past straight-down-the-face the board swings back toward the whitewater (radians). */
+      swing: 1.15,
+    },
+    snap: {
+      /** Seconds climbing to the lip, then seconds whipping back down. */
+      climbTime: 0.36,
+      whipTime: 0.3,
+      /** Angle above and below the trim line (radians). */
+      angle: 0.95,
+      climbTurnRate: 6,
+      whipTurnRate: 11,
+      /** Speed gained from the whip. */
+      speedGain: 1.5,
+    },
+    hangTen: {
+      /** Must be held this long to count. */
+      minTime: 0.5,
+      /** Longest it can be held. */
+      maxTime: 4,
+      /** Extra thrust while on the nose. */
+      accel: 3.5,
+      /** Top speed multiplier while on the nose. */
+      topSpeedBoost: 1.15,
+    },
+    tailSlide: {
+      minTime: 0.3,
+      maxTime: 1.4,
+      /** How far the tail swings out (radians). */
+      angle: 1.25,
+      /** Extra drag while sliding (per second). */
+      drag: 0.35,
+    },
+    floater: {
+      minTime: 0.45,
+      maxTime: 1.8,
+      /** Where on the wave the board floats, in face widths in front of the crest. */
+      line: 0.02,
+      /** How fast the board is pulled up to the crest (metres per second). */
+      climbSpeed: 9,
+      /** Speed gained dropping back down. */
+      speedGain: 2,
+    },
   },
 
   wipeout: {
@@ -209,7 +382,11 @@ export const CONFIG = {
     airPullBack: 3,
     /** Field of view added at top speed. */
     speedFov: 10,
+    /** Flying out to sea: how quickly the camera swings in behind the flight, and how much higher it sits. */
+    seawardYawFollow: 5,
+    seawardHeight: 3.5,
   },
 };
 
 export type GameConfig = typeof CONFIG;
+export type BoardTuning = (typeof CONFIG.boards)[number];

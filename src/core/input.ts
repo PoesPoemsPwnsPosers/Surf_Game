@@ -5,6 +5,7 @@ export class Input {
   mouseDX = 0;
   mouseDY = 0;
   mouseDown = false;
+  rightDown = false;
   pointerLocked = false;
 
   constructor(private canvas: HTMLCanvasElement) {
@@ -23,10 +24,13 @@ export class Input {
     });
     canvas.addEventListener('mousedown', (e) => {
       if (e.button === 0) this.mouseDown = true;
+      if (e.button === 2) this.rightDown = true;
     });
     window.addEventListener('mouseup', (e) => {
       if (e.button === 0) this.mouseDown = false;
+      if (e.button === 2) this.rightDown = false;
     });
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     document.addEventListener('pointerlockchange', () => {
       this.pointerLocked = document.pointerLockElement === this.canvas;
     });

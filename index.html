@@ -17,6 +17,7 @@
       </div>
       <div id="banner"></div>
       <div id="prompt"></div>
+      <div id="board"><span id="board-name"></span><div id="kicks"></div></div>
       <div id="speed"><span id="speed-value">0</span><span class="unit">mph</span></div>
       <div id="hint"></div>
     </div>
@@ -26,13 +27,22 @@
         <h1 id="overlay-title">Venice Beach</h1>
         <p id="overlay-sub">Loading…</p>
         <div class="controls">
-          <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Paddle. On a wave: A and D carve, W leans in for speed, S stalls.</span></div>
-          <div><kbd>Space</kbd><span>Pop up when a wave reaches you. On a wave: jump. Ride up the face fast to launch off the lip.</span></div>
-          <div><kbd>Shift</kbd><span>Pump for speed (paddle faster in the water).</span></div>
-          <div><kbd>Q</kbd><kbd>E</kbd><span>In the air: spin left and right.</span></div>
-          <div><kbd>W</kbd><kbd>S</kbd><span>In the air: front flip and back flip. Let go to level out before you land.</span></div>
-          <div><kbd>Mouse</kbd><span>Look around.</span></div>
-          <div><kbd>Esc</kbd><span>Pause.</span></div>
+          <div class="group">In the water</div>
+          <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Paddle. Hold <b>Shift</b> to sprint.</span></div>
+          <div><kbd>Space</kbd><span>Pop up when a wave reaches you.</span></div>
+          <div class="group">On the wave (hands off, the board trims by itself)</div>
+          <div><kbd>A</kbd><kbd>D</kbd><span>Carve. <b>Shift</b> pumps for speed, <b>W</b> leans in, <b>S</b> stalls.</span></div>
+          <div><kbd>Space</kbd><span>Jump. Carve up the face with speed to launch off the lip. Aim straight out to sea over a small lip to fly out the back.</span></div>
+          <div><kbd>Q</kbd><span>Cutback.</span><kbd>E</kbd><span>Snap.</span></div>
+          <div><kbd>W</kbd>+<kbd>Q</kbd><span>Hang ten (hold).</span><kbd>S</kbd>+<kbd>Q</kbd><span>Tail slide (hold).</span></div>
+          <div><kbd>W</kbd>+<kbd>E</kbd><span>Floater (hold).</span></div>
+          <div class="group">In the air</div>
+          <div><kbd>Q</kbd><kbd>E</kbd><span>Spin.</span><kbd>W</kbd><kbd>S</kbd><span>Flip. Let go to level out.</span></div>
+          <div><kbd>A</kbd><kbd>D</kbd><span>Steer the flight.</span><kbd>F</kbd><span>Grab (or right mouse).</span></div>
+          <div><kbd>Shift</kbd>+<kbd>W</kbd>/<kbd>S</kbd><span>Stretch or shorten the flight.</span></div>
+          <div><kbd>Space</kbd><span>Air kick for extra height and distance. Earn kicks by landing tricks and riding fast.</span></div>
+          <div class="group">Other</div>
+          <div><kbd>1</kbd>-<kbd>4</kbd><span>Swap boards (test keys until the shop exists).</span><kbd>Esc</kbd><span>Pause.</span></div>
         </div>
         <button id="overlay-button" disabled>Loading…</button>
       </div>

@@ -28,6 +28,15 @@ class Game {
   private last = 0;
   private acc = 0;
   private sprayAcc = 0;
+  private shadow = new THREE.Mesh(
+    new THREE.CircleGeometry(1.1, 12).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({ color: 0x06304d, transparent: true, opacity: 0.4, depthWrite: false }),
+  );
+  private landRing = new THREE.Mesh(
+    new THREE.RingGeometry(1.5, 2.0, 6).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide }),
+  );
+  private landPoint = new THREE.Vector3();
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -77,10 +86,13 @@ class Game {
     this.scene.add(this.ocean.farPlane, this.ocean.mesh, this.spray.mesh);
     this.env = this.level.buildEnvironment(this.scene, this.waves);
     this.surfer = new Surfer(this.waves);
-    this.scene.add(this.surfer.model.root);
+    this.scene.add(this.surfer.model.root, this.shadow, this.landRing);
+    this.shadow.visible = false;
+    this.landRing.visible = false;
+    this.surfer.events.length = 0;
 
     this.hud = new Hud(this.level.waves.wavesPerSet, () => this.onOverlayButton());
-    this.hud.showOverlay(this.level.name, 'Milestone 1: surfing feel. Paddle out to the buoys and catch a wave.', 'SURF');
+    this.hud.showOverlay(this.level.name, 'Paddle out to the buoys, catch a wave, then get airborne.', 'SURF');
     this.mode = 'ready';
 
     this.waves.update(0);
@@ -127,6 +139,7 @@ class Game {
     let n = 0;
     while (this.acc >= step && n < 16) {
       this.waves.update(step);
+      this.debugKeys();
       this.surfer.step(step, this.input, this.cam.yaw);
       this.input.consumePresses();
       this.acc -= step;
@@ -146,10 +159,37 @@ class Game {
       this.spray.update(dt);
       this.env.update(dt, this.waves.time);
     }
+    this.updateMarkers();
     this.cam.update(dt, this.surfer, this.input, this.waves);
     if (this.mode !== 'loading') this.hud.update(dt, this.surfer, this.waves);
     this.renderer.render(this.scene, this.cam.camera);
     this.input.endFrame();
+  }
+
+  /** Test keys until the shop exists: 1 to 4 swap boards. */
+  private debugKeys(): void {
+    for (let i = 0; i < CONFIG.boards.length; i++) {
+      if (this.input.wasPressed(`Digit${i + 1}`)) this.surfer.setBoard(i);
+    }
+  }
+
+  /** A shadow under the surfer and a ring where the flight will come down. */
+  private updateMarkers(): void {
+    const s = this.surfer;
+    const airborne = s.state === 'air';
+    this.shadow.visible = airborne;
+    this.landRing.visible = airborne;
+    if (!airborne) return;
+    const y = this.waves.height(s.pos.x, s.pos.z);
+    const alt = Math.max(0, s.pos.y - y);
+    this.shadow.position.set(s.pos.x, y + 0.12, s.pos.z);
+    this.shadow.scale.setScalar(1 + alt * 0.12);
+    (this.shadow.material as THREE.MeshBasicMaterial).opacity = Math.max(0.12, 0.42 - alt * 0.02);
+    if (s.predictLanding(this.landPoint)) {
+      this.landRing.position.set(this.landPoint.x, this.waves.height(this.landPoint.x, this.landPoint.z) + 0.3, this.landPoint.z);
+      this.landRing.rotation.y += 0.05;
+      this.landRing.visible = alt > 1.2;
+    }
   }
 
   // ---------------------------------------------------------------- effects
@@ -166,16 +206,37 @@ class Game {
       case 'land': {
         this.spray.burst(p.x, p.y, p.z, 30, 6);
         this.cam.addShake(0.25);
-        // Milestone 2 turns these into named tricks and points.
+        // Milestone 2 turns these into points.
         const spins = Math.round(Math.abs(e.spin) / Math.PI) * 180;
         const flips = Math.round(Math.abs(e.flip) / (Math.PI * 2));
         const parts: string[] = [];
+        if (e.hopped) parts.push('WAVE HOP');
         if (flips > 0) parts.push(`${flips > 1 ? `${flips}x ` : ''}${e.flip > 0 ? 'Front' : 'Back'}flip`);
         if (spins > 0) parts.push(`${spins} spin`);
-        if (parts.length === 0 && e.airTime > 0.9) parts.push('Big air');
-        if (parts.length > 0) this.hud.flash(`${parts.join(' + ')}!`, 'good');
+        if (e.grab > 0) parts.push('Grab');
+        if (parts.length === 0 && e.airTime > 0.9) parts.push(e.seaward ? 'Out the back' : 'Big air');
+        if (parts.length > 0) this.hud.flash(`${parts.join(' + ')}!`, 'good', e.hopped ? 2 : 1.4);
         break;
       }
+      case 'trick':
+        this.hud.flash(`${e.name}!`, 'good', 1.1);
+        break;
+      case 'spray':
+        // A fan of spray thrown out to sea off the top of the wave.
+        for (let i = 0; i < 46; i++) {
+          const a = (Math.random() - 0.5) * 1.6;
+          const v = 5 + Math.random() * 7 * e.power;
+          this.spray.emit(p.x, p.y + 0.2, p.z, Math.sin(a) * v, 3 + Math.random() * 6, -Math.cos(a) * v, 0.5 + Math.random() * 0.5, 0.9 + Math.random() * 1.4);
+        }
+        break;
+      case 'kick':
+        this.spray.burst(p.x, p.y, p.z, 18, 4);
+        this.cam.addShake(0.18);
+        this.hud.flash('Air kick!', 'good', 0.8);
+        break;
+      case 'board':
+        if (this.mode === 'playing') this.hud.flash(e.name, 'good', 0.9);
+        break;
       case 'wipeout':
         this.spray.burst(p.x, p.y, p.z, 50, 8);
         this.cam.addShake(0.9);
@@ -192,7 +253,8 @@ class Game {
     const T = this.waves.tuning;
     // Rooster tail behind the board.
     if (s.state === 'surf' && s.speed > 3) {
-      this.sprayAcc += dt * (6 + s.speed * 2.2 + Math.abs(s.lean) * 40);
+      const showy = s.trick === 'tailSlide' ? 90 : s.trick === 'cutback' ? 50 : s.trick === 'floater' ? 40 : 0;
+      this.sprayAcc += dt * (6 + s.speed * 2.2 + Math.abs(s.lean) * 40 + showy);
       while (this.sprayAcc >= 1) {
         this.sprayAcc -= 1;
         const side = (Math.random() - 0.5) * 2;
@@ -232,6 +294,7 @@ class Game {
     const step = 1 / CONFIG.physicsHz;
     for (let t = 0; t < seconds; t += step) {
       this.waves.update(step);
+      this.debugKeys();
       this.surfer.step(step, this.input, this.cam.yaw);
       this.input.consumePresses();
       this.cam.update(step, this.surfer, this.input, this.waves);
