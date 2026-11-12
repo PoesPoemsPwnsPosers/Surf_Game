@@ -525,7 +525,11 @@ export class Surfer {
     const fz = this.forwardZ;
     // Pointed out to sea over a lip that is not too big: fly out the back.
     // Otherwise the lip throws the board back toward the beach, onto the face.
-    this.seaward = !!ws && this.carry > 0.3 && fz < -A.seawardAim && !this.lipOverwhelming(ws);
+    // Guiderails shrink on the better boards: a wider take-off angle counts, and a board with
+    // little guidance ignores the big-lip rule. With none at all, any seaward lean flies out.
+    const g = this.board.guide;
+    this.seaward =
+      !!ws && this.carry > 0.3 && fz < -A.seawardAim * g && (g < 0.5 || !this.lipOverwhelming(ws));
     this.launchWave = ws ? ws.wave : null;
     if (this.seaward) {
       // From here on airVX/airVZ are speeds over the water, not relative to the wave.
@@ -591,7 +595,7 @@ export class Surfer {
     }
 
     // Flying out the back: ease off a flight that would sail past the next wave, so it lands on the face.
-    if (this.seaward && !shift && A.hopAssist > 0 && this.airVZ < 0) {
+    if (this.seaward && !shift && A.hopAssist * B.guide > 0 && this.airVZ < 0) {
       let next: Wave | null = null;
       for (const cand of this.waves.waves) {
         if (cand === this.launchWave || cand.crestZ > this.pos.z + 2 || cand.amp < 1.5) continue;
@@ -605,7 +609,7 @@ export class Surfer {
           const need = (targetZ - this.pos.z) / tLand;
           // `need` and airVZ are both negative (out to sea). Only ever slow down.
           if (need > this.airVZ) {
-            const nextVZ = Math.min(need, this.airVZ + A.hopAssist * dt);
+            const nextVZ = Math.min(need, this.airVZ + A.hopAssist * B.guide * dt);
             this.airVZ = Math.min(nextVZ, -0.5);
           }
         }
@@ -627,11 +631,11 @@ export class Surfer {
 
     // Arcade help for airs off a big lip: drift back over the face of the wave we launched from.
     const w = this.airWave;
-    if (w && this.waves.waves.includes(w) && w.amp > 0.6) {
+    if (w && B.guide > 0 && this.waves.waves.includes(w) && w.amp > 0.6) {
       const ahead = this.pos.z - w.crestZ;
       const want = clamp((w.faceWidth * 0.95 - ahead) * A.waveMagnet, -9, 9);
-      this.airVZ += (want - this.airVZ) * Math.min(1, 2.5 * dt);
-      this.airFrame += (T.speed - this.airFrame) * Math.min(1, 4 * dt);
+      this.airVZ += (want - this.airVZ) * Math.min(1, 2.5 * B.guide * dt);
+      this.airFrame += (T.speed - this.airFrame) * Math.min(1, 4 * B.guide * dt);
     }
     this.pos.x += this.airVX * dt;
     this.pos.z += (this.airVZ + this.airFrame) * dt;

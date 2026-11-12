@@ -76,8 +76,16 @@ of the fun happens in the air.
   start with one, and earn more by landing air tricks, doing wave tricks, and pumping past the
   board's normal top speed. The meter is bottom right.
 - **Wave hopping.** A launch out the back can land on the next wave of the set and the ride
-  carries on ("WAVE HOP!"). If the flight would sail past the next wave it is eased off so it
-  comes down on the face. It is never sped up, and holding Shift turns the help off.
+  carries on ("WAVE HOP!"). On the slower boards, a flight that would sail past the next wave
+  is eased off so it comes down on the face. It is never sped up, and holding Shift turns the
+  help off.
+- **Guiderails per board** (`guide` in each board's settings, 0 to 1). The Foamie and Fish
+  (1) keep the help: airs are pulled back over the face, flights out the back are eased onto
+  the next wave, and you only fly out the back from a near-straight take-off over a small lip.
+  The Shortboard (0.5) gets half the pull, wider take-off angles, and ignores the big-lip rule.
+  The Pro Gun (0) has none: any take-off leaning out to sea flies out the back, nothing pulls
+  the flight, and air steering is much stronger. You choose where you land; Shift+S shortens
+  the flight to drop onto the next wave.
 - **Soft landings.** Coming down on flat water behind the wave is not a wipeout. The board
   coasts to a stop and you are back to paddling, usually in time for the next wave.
 - **Flight camera and markers.** When flying out to sea the camera swings in behind the flight
@@ -90,7 +98,7 @@ How the boards compare in scripted playtests (same wave, same inputs):
 | Foamie | 26 mph | 38 mph | about 1.6 s | Only with a pump and an air kick |
 | Fish | 32 mph | 46 mph | about 1.7 s | With a pump |
 | Shortboard | 38 mph | 56 mph | about 1.9 s | Yes, without pumping |
-| Pro Gun | 43 mph | 66 mph | about 2.0 s | Yes, without pumping |
+| Pro Gun | 43 mph | 66 mph | about 2.1 s | Flies past it unless you aim: hold Shift+S for about 0.7 s |
 
 Speeds are along the board; the speed readout in the game also includes the wave carrying you.
 

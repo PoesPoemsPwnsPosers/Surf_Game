@@ -76,6 +76,12 @@ export const CONFIG = {
   boards: [
     {
       name: 'Foamie',
+      /**
+       * Guiderails in the air, 0 to 1. At 1 the game steers airs back onto the wave: the wave
+       * magnet, the wave-hop helper, and flying out the back only from a near-straight take-off
+       * over a small lip. At 0 there are none: you fly where you aim and choose where you land.
+       */
+      guide: 1,
       /** Fastest upward speed a launch can have on this board. Sets how big its airs are. */
       launchPower: 10.5,
       /** Top speed along the board without pumping, and while pumping. */
@@ -103,6 +109,7 @@ export const CONFIG = {
     },
     {
       name: 'Fish',
+      guide: 1,
       launchPower: 12,
       maxSpeed: 14,
       pumpMaxSpeed: 19,
@@ -120,6 +127,7 @@ export const CONFIG = {
     },
     {
       name: 'Shortboard',
+      guide: 0.5,
       launchPower: 13.5,
       maxSpeed: 17,
       pumpMaxSpeed: 23,
@@ -129,14 +137,15 @@ export const CONFIG = {
       spinLandTolerance: 1.18,
       flipLandTolerance: 1.2,
       foamGrace: 1.5,
-      airSteer: 1.7,
-      airDrift: 8,
+      airSteer: 2.2,
+      airDrift: 9,
       scale: 1.14,
       color: 0xffd23f,
       stripe: 0x0d2b45,
     },
     {
       name: 'Pro Gun',
+      guide: 0,
       launchPower: 15,
       maxSpeed: 20,
       pumpMaxSpeed: 27,
@@ -146,8 +155,8 @@ export const CONFIG = {
       spinLandTolerance: 1.3,
       flipLandTolerance: 1.4,
       foamGrace: 1.8,
-      airSteer: 2.0,
-      airDrift: 9.5,
+      airSteer: 3.4,
+      airDrift: 13,
       scale: 1.3,
       color: 0xff5a5f,
       stripe: 0xffd23f,
