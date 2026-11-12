@@ -46,6 +46,17 @@ export interface WaveTuning {
   foamHeightFraction: number;
   /** The peak of each wave is placed randomly within +/- this distance of x = 0. */
   peakSpread: number;
+  /** Each wave's height varies by plus or minus this fraction. */
+  sizeVariation: number;
+  /** Bowl sections per wave: taller, steeper stretches that give extra speed. */
+  bowlsPerWave: number;
+  /** How far from the peak the bowls sit (metres), their width, and how much taller they are (fraction). */
+  bowlMinOffset: number;
+  bowlMaxOffset: number;
+  bowlWidth: number;
+  bowlGain: number;
+  /** Size of the ribs and ripples drawn on the wave face (fraction of wave height). Visual only. */
+  faceDetail: number;
   /** How far the lip pitches forward (visual only), as a fraction of wave height. */
   lipCurl: number;
 }
@@ -186,6 +197,13 @@ export const CONFIG = {
       foamHeightFraction: 0.5,
       peakSpread: 45,
       lipCurl: 0,
+      sizeVariation: 0.1,
+      bowlsPerWave: 3,
+      bowlMinOffset: 30,
+      bowlMaxOffset: 120,
+      bowlWidth: 13,
+      bowlGain: 0.3,
+      faceDetail: 0.035,
     } satisfies WaveTuning,
   },
 
@@ -234,6 +252,8 @@ export const CONFIG = {
     slideRate: 3,
     /** Drag once the wave has left the board behind (per second). */
     offWaveDrag: 1.4,
+    /** Riding a taller section than usual raises top speed and drive by this much per unit of extra height. */
+    bowlSpeed: 0.9,
     /** The ride ends when the board is off the wave and slower than this. */
     endSpeed: 2.2,
   },
@@ -262,9 +282,12 @@ export const CONFIG = {
     /** Pull that brings the surfer back over the wave face while airborne. */
     waveMagnet: 1.6,
     /** Fraction of speed kept on landing. The board keeps the direction it was flying in. */
-    landSpeedKeep: 0.94,
+    landSpeedKeep: 1,
+    /** After a landing the board skims: for this long, flat-water drag is cut to `landGlideDrag` of normal, easing back. */
+    landGlideTime: 3,
+    landGlideDrag: 0.12,
     /** Landing against an oncoming wave face keeps only this fraction of the speed into the face. */
-    landFaceAbsorb: 0.3,
+    landFaceAbsorb: 0.55,
     /** For this long after landing, the hands-off autopilot carves this many times harder to settle into trim. */
     landCarveTime: 0.9,
     landCarveBoost: 3.2,
@@ -386,10 +409,12 @@ export const CONFIG = {
     minHeight: 2.2,
     /** Shorter visits than this do not score (seconds). */
     minTime: 0.4,
-    /** How far the lip throws forward over the face, in face widths, and how far its tip drops (metres). */
-    lipReach: 1.6,
-    lipDrop: 1.4,
-    lipRise: 1.2,
+    /** The lip is an arch over the face: half its span in face widths, and its height above the crest (metres). */
+    lipReach: 0.8,
+    lipRise: 1.7,
+    /** How far round the lip curls at its thickest, in half turns (1 is a half pipe roof, more hangs down in front). */
+    lipWrap: 1.22,
+    lipOpacity: 0.86,
   },
 
   /** Cool points. Every number the scoring uses. */
@@ -443,8 +468,9 @@ export const CONFIG = {
     life: 1.1,
     /** Width of each streak (metres). */
     width: 0.34,
-    /** The trail starts to show above this speed and is at full strength at the board's pumped top speed. */
-    minSpeed: 7,
+    /** As multiples of the board's cruising top speed: faint from `startFraction`, full at `fullFraction`. */
+    startFraction: 1.1,
+    fullFraction: 1.75,
     /** Colour at the board and at the fading end. */
     color: 0xff1228,
     fadeColor: 0xff4a3a,

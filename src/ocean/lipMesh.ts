@@ -3,8 +3,8 @@ import { CONFIG } from '../config';
 import { smoothstep, type WaveSystem } from './waves';
 
 const STRIPS = 10; // enough for five breaking waves, two sides each
-const COLS = 14; // along the wave
-const ROWS = 7; // around the curl
+const COLS = 28; // along the wave
+const ROWS = 12; // around the curl
 
 /**
  * The curling lip: a sheet of water thrown forward off the crest, just ahead
@@ -39,9 +39,18 @@ export class LipMesh {
     geo.setIndex(index);
     this.mesh = new THREE.Mesh(
       geo,
-      new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.6, side: THREE.DoubleSide }),
+      new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        flatShading: true,
+        roughness: 0.35,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: CONFIG.barrel.lipOpacity,
+        depthWrite: false,
+      }),
     );
     this.mesh.frustumCulled = false;
+    this.mesh.renderOrder = 2;
     this.cFace = new THREE.Color(look.face);
     this.cFoam = new THREE.Color(look.foam).multiplyScalar(1.4);
   }
@@ -50,6 +59,7 @@ export class LipMesh {
     const B = CONFIG.barrel;
     const { positions, colors, cFace, cFoam } = this;
     let strip = 0;
+    const t = this.waves.time;
     for (const w of this.waves.waves) {
       if (w.brokenHalfWidth < 0 || w.amp < B.minHeight * 0.6) continue;
       for (const side of [-1, 1]) {
@@ -66,19 +76,27 @@ export class LipMesh {
             smoothstep(B.inside, 0.5, fromFoam) *
             Math.pow(1 - smoothstep(0, B.width + 2, fromFoam), 0.8) *
             smoothstep(B.minHeight * 0.7, B.minHeight * 1.3, amp);
-          const reach = B.lipReach * w.faceWidth * size;
-          const crestY = this.waves.height(x, w.crestZ);
+          // An arch from the crest, up and over the face, and down in front. It wraps further where it is thickest.
+          const spanZ = B.lipReach * w.faceWidth * (0.3 + 0.7 * size);
+          const rise = B.lipRise * size;
+          const wrap = Math.PI * B.lipWrap * (0.25 + 0.75 * size);
+          const crestY = this.waves.height(x, w.crestZ) - 0.2;
+          // Ribs along the sheet and a ragged, falling edge.
+          const rib = 1 + 0.07 * Math.sin(x * 1.9 + w.id) + 0.05 * Math.sin(x * 4.3 - t * 3);
+          const ragged = 0.35 * Math.sin(x * 2.7 + t * 6 + w.id) + 0.25 * Math.sin(x * 6.1 - t * 9);
           for (let r = 0; r <= ROWS; r++) {
             const u = r / ROWS;
+            const a = wrap * u + (r === ROWS ? ragged * 0.18 : 0);
             const i = (base + c * (ROWS + 1) + r) * 3;
             positions[i] = x;
-            // Up and over: rises off the crest, then falls away at the tip.
-            positions[i + 1] = crestY - 0.15 + size * (B.lipRise * Math.sin(u * Math.PI * 0.85) - B.lipDrop * u * u);
-            positions[i + 2] = w.crestZ - 0.4 + reach * u;
-            const t = u * u;
-            colors[i] = cFace.r + (cFoam.r - cFace.r) * t;
-            colors[i + 1] = cFace.g + (cFoam.g - cFace.g) * t;
-            colors[i + 2] = cFace.b + (cFoam.b - cFace.b) * t;
+            positions[i + 1] = crestY + rise * rib * Math.sin(a) - (r === ROWS ? Math.abs(ragged) * 0.5 * size : 0);
+            positions[i + 2] = w.crestZ - 0.5 + spanZ * rib * (1 - Math.cos(a));
+            // Glassy green at the root, lighter over the top, white water at the falling edge.
+            const k = smoothstep(0.55, 1, u);
+            const glow = 0.25 * Math.sin(u * Math.PI);
+            colors[i] = cFace.r + glow + (cFoam.r - cFace.r - glow) * k;
+            colors[i + 1] = cFace.g + glow + (cFoam.g - cFace.g - glow) * k;
+            colors[i + 2] = cFace.b + glow + (cFoam.b - cFace.b - glow) * k;
           }
         }
       }

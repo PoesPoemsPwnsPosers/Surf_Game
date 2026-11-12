@@ -88,8 +88,8 @@ class Game {
       maxX: W.halfWidth + 60,
       minZ: this.level.waves.spawnZ - 10,
       maxZ: W.shoreZ + 4,
-      cellX: 2.6,
-      cellZ: 1.55,
+      cellX: 2.3,
+      cellZ: 1.4,
       look: this.level.ocean,
     });
     this.lip = new LipMesh(this.waves, this.level.ocean);
@@ -199,8 +199,11 @@ class Game {
     this.tailR.set(-0.2 * b.scale, 0.1, -1.05 * b.scale).applyMatrix4(pivot.matrixWorld);
     const T = CONFIG.trail;
     const riding = s.state === 'surf' || s.state === 'air';
-    const power = Math.min(1, Math.max(0, (s.displaySpeed - T.minSpeed) / Math.max(1, b.pumpMaxSpeed - T.minSpeed)));
-    this.trail.update(dt, riding && power > 0, this.tailL, this.tailR, 0.35 + 0.65 * power, this.cam.camera.position, this.surfaceAt);
+    // Barely there at cruising speed; it only really lights up when the board is flying.
+    const from = b.maxSpeed * T.startFraction;
+    const lin = Math.min(1, Math.max(0, (s.displaySpeed - from) / (b.maxSpeed * T.fullFraction - from)));
+    const power = lin * lin;
+    this.trail.update(dt, riding && power > 0.01, this.tailL, this.tailR, power, this.cam.camera.position, this.surfaceAt);
   }
 
   /** A shadow under the surfer and a ring where the flight will come down. */
@@ -264,7 +267,7 @@ class Game {
       case 'wipeout':
         this.spray.burst(p.x, p.y, p.z, 50, 8);
         this.cam.addShake(0.9);
-        this.hud.flash('WIPEOUT!', 'bad', 1.6);
+        this.hud.flash(e.reason === 'lip' ? 'HIT THE LIP!' : 'WIPEOUT!', 'bad', 1.6);
         break;
       case 'rideEnd':
       case 'respawn':

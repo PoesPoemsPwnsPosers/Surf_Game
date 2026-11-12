@@ -107,7 +107,7 @@ class Streak {
       const len = Math.hypot(sx, sy, sz) || 1;
       const life = Math.max(0, 1 - this.age[i] / T.life);
       // Taper toward the tail.
-      const w = (T.width * 0.5 * (0.35 + 0.65 * life)) / len;
+      const w = (T.width * 0.5 * (0.35 + 0.65 * life) * (0.45 + 0.55 * this.power[i])) / len;
       sx *= w;
       sy *= w;
       sz *= w;

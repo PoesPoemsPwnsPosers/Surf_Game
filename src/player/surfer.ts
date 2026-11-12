@@ -33,7 +33,7 @@ export type SurferEvent =
   | { type: 'kick' }
   | { type: 'spray'; power: number }
   | { type: 'board'; name: string }
-  | { type: 'wipeout'; reason: 'landing' | 'foam' }
+  | { type: 'wipeout'; reason: 'landing' | 'foam' | 'lip' }
   | { type: 'rideEnd'; rideTime: number }
   | { type: 'respawn' };
 
@@ -118,7 +118,13 @@ export class Surfer {
   private kicksUsed = 0;
   private airYaw = 0;
   private landAssist = 0;
+  /** Counts down after a landing while the board skims with little drag. */
+  private landGlide = 0;
+  /** True while the curling lip is overhead, wherever on the face the board is. */
+  underLip = false;
   private landSide = 1;
+  /** 1 on a normal stretch of wave, more on a taller bowl section. */
+  bowlBoost = 1;
   /** Banked air kicks. Whole numbers are usable; the fraction is progress to the next. */
   kickCharges = CONFIG.air.kickStartCharges;
 
@@ -379,10 +385,13 @@ export class Surfer {
     // ---- Barrel: tucked under the curling lip, just ahead of where the wave is breaking.
     const BR = CONFIG.barrel;
     let tubed = false;
-    if (ws && this.carry > 0.5 && ws.wave.brokenHalfWidth >= 0 && ws.localAmp > BR.minHeight) {
+    this.underLip = false;
+    if (ws && this.carry > 0.3 && ws.wave.brokenHalfWidth >= 0 && ws.localAmp > BR.minHeight) {
       const fromFoam = Math.abs(this.pos.x - ws.wave.peakX) - ws.wave.brokenHalfWidth;
       const up = ws.ahead / ws.wave.faceWidth;
-      tubed = fromFoam > BR.inside && fromFoam < BR.width && up > BR.minAhead && up < BR.maxAhead;
+      // The lip is overhead from the crest out to where it comes down in front. It thins toward the shoulder.
+      this.underLip = fromFoam > BR.inside && fromFoam < BR.width * 0.8 && up > -0.1 && up < BR.maxAhead;
+      tubed = this.carry > 0.5 && fromFoam > BR.inside && fromFoam < BR.width && up > BR.minAhead && up < BR.maxAhead;
     }
     if (tubed) {
       this.inBarrel = true;
@@ -487,15 +496,21 @@ export class Surfer {
 
     this.pumping = input.isDown('ShiftLeft') || input.isDown('ShiftRight');
     let accel = -S.slopeGravity * slopeAlong * (slopeAlong > 0 ? S.climbEase : 1);
-    accel += B.trimAccel * Math.min(1, slopeMag) * Math.abs(fx) * this.carry;
+    accel += B.trimAccel * Math.min(1, slopeMag) * Math.abs(fx) * this.carry * this.bowlBoost * this.bowlBoost;
     if (this.pumping) accel += B.pumpAccel * (0.3 + 0.7 * near);
     if (input.isDown('KeyW') && !trick) accel += S.leanAccel * near;
     accel += accelBonus;
-    let drag = S.drag + (1 - near) * S.offWaveDrag + extraDrag;
+    // Fresh off a landing the board skims across flat water instead of bogging down.
+    this.landGlide = Math.max(0, this.landGlide - dt);
+    const glide = 1 - (1 - A.landGlideDrag) * Math.min(1, (this.landGlide / A.landGlideTime) * 2);
+    let drag = S.drag + (1 - near) * S.offWaveDrag * glide + extraDrag;
     if (input.isDown('KeyS') && !trick) drag += S.brakeDrag;
     accel -= drag * this.speed;
     this.speed = Math.max(0, this.speed + accel * dt);
-    const cap = (this.pumping ? B.pumpMaxSpeed : B.maxSpeed) * capBoost;
+    // Taller sections of the wave (bowls) are faster: more top speed while the board is on one.
+    const bowl = ws ? 1 + S.bowlSpeed * clamp(ws.localAmp / (T.height * (1 + T.peakBonus * 0.5)) - 1, 0, 0.5) * this.carry : 1;
+    this.bowlBoost = bowl;
+    const cap = (this.pumping ? B.pumpMaxSpeed : B.maxSpeed) * capBoost * bowl;
     if (this.speed > cap) this.speed -= (this.speed - cap) * Math.min(1, 3 * dt);
 
     // Riding flat out slowly earns an air kick.
@@ -522,6 +537,11 @@ export class Surfer {
       this.vy - A.gravity * A.lipStick * dt > surfaceVY + 0.1 &&
       this.stateTime > 0.15;
     const jump = input.wasPressed('Space') && this.stateTime > 0.12;
+    if ((offLip || jump) && this.underLip) {
+      // No way up through a barrel: the lip is in the way.
+      this.wipeout('lip');
+      return;
+    }
     if (offLip || jump) {
       let vy = Math.max(this.vy, 0);
       if (offLip) vy *= A.lipLaunchBoost;
@@ -725,6 +745,7 @@ export class Surfer {
       this.speed = landed * A.landSpeedKeep;
       // For a moment the hands-off autopilot carves harder, to bend the landing into a trim line.
       this.landAssist = A.landCarveTime;
+      this.landGlide = A.landGlideTime;
       this.landSide = Math.abs(wx) > 1.5 ? Math.sign(wx) : ws ? Math.sign(this.pos.x - ws.wave.peakX) || 1 : 1;
       const grabbed = this.grabTime >= A.grabMinTime;
       const tricked = Math.abs(this.spin) > Math.PI * 0.75 || Math.abs(this.flip) > Math.PI * 1.5 || grabbed;
@@ -786,7 +807,7 @@ export class Surfer {
 
   // ------------------------------------------------------- wipeout and reset
 
-  private wipeout(reason: 'landing' | 'foam'): void {
+  private wipeout(reason: 'landing' | 'foam' | 'lip'): void {
     // A wipeout throws away whatever was in progress.
     this.trick = null;
     this.model.boardYaw = 0;

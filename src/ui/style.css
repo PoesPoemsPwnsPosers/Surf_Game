@@ -103,6 +103,6 @@ button:not(:disabled):active { transform: translateY(3px); box-shadow: 0 2px 0 #
 .popup.bank { font-size: 24px; color: var(--sun); }
 .popup.lost, .popup.lost b { color: var(--coral); }
 @keyframes popup { 0% { opacity: 0; transform: translateX(-24px) scale(1.25); } 10% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-10px); } }
-#barrel-tag { position: absolute; left: 50%; top: 27%; transform: translateX(-50%); font-size: 22px; font-weight: 900; font-style: italic; letter-spacing: 0.12em; color: var(--sun); opacity: 0; transition: opacity 0.15s; }
+#barrel-tag { position: absolute; left: 50%; top: 37%; transform: translateX(-50%); font-size: 22px; font-weight: 900; font-style: italic; letter-spacing: 0.12em; color: var(--sun); opacity: 0; transition: opacity 0.15s; }
 #barrel-tag.on { opacity: 1; }
 .controls .lead { margin-left: 0; font-weight: 700; }

@@ -27,6 +27,10 @@ export interface Wave {
   brokenHalfWidth: number;
   /** 0 as a swell, 1 once it reaches the lineup. */
   growth: number;
+  /** This wave's own size, as a multiple of the usual height. */
+  scale: number;
+  /** Bowl sections: taller stretches along the wave that give extra speed. */
+  bowls: { x: number; width: number; gain: number }[];
 }
 
 /** What one wave looks like at one point. */
@@ -48,6 +52,8 @@ export interface SurfaceSample {
   curl: number;
   /** 0 to 1, how high up a wave this point is. */
   rise: number;
+  /** How much taller than usual the wave is here (0 on a normal stretch, up to about 1 in a bowl). */
+  bowl: number;
 }
 
 /**
@@ -92,7 +98,20 @@ export class WaveSystem {
       const base = this.setArrival(this.nextSetIndex);
       const setPeak = (this.rand() * 2 - 1) * T.peakSpread;
       for (let i = 0; i < T.wavesPerSet; i++) {
+        // Every wave is a little different: its own size, and a couple of taller bowl sections.
+        const bowls: Wave['bowls'] = [];
+        for (let b = 0; b < T.bowlsPerWave; b++) {
+          const side = b % 2 === 0 ? 1 : -1;
+          bowls.push({
+            x: side * lerp(T.bowlMinOffset, T.bowlMaxOffset, this.rand()),
+            width: lerp(T.bowlWidth * 0.7, T.bowlWidth * 1.3, this.rand()),
+            gain: lerp(T.bowlGain * 0.6, T.bowlGain, this.rand()),
+          });
+        }
+        const scale = lerp(1 - T.sizeVariation, 1 + T.sizeVariation, this.rand());
         this.waves.push({
+          scale,
+          bowls,
           id: this.nextId++,
           setIndex: this.nextSetIndex,
           indexInSet: i,
@@ -148,7 +167,13 @@ export class WaveSystem {
     const T = this.tuning;
     const px = (x - w.peakX) / T.peakWidth;
     const edge = 1 - smoothstep(this.halfWidth - 10, this.halfWidth + 25, Math.abs(x));
-    let amp = w.amp * (1 + T.peakBonus * Math.exp(-px * px)) * edge;
+    let shape = 1 + T.peakBonus * Math.exp(-px * px);
+    for (let i = 0; i < w.bowls.length; i++) {
+      const b = w.bowls[i];
+      const bx = (x - w.peakX - b.x) / b.width;
+      shape += b.gain * Math.exp(-bx * bx);
+    }
+    let amp = w.amp * w.scale * shape * edge;
     let foam = 0;
     if (w.brokenHalfWidth >= 0) {
       const dist = Math.abs(x - w.peakX);
@@ -157,6 +182,11 @@ export class WaveSystem {
       amp *= lerp(1, T.foamHeightFraction, foam);
     }
     return { amp, foam };
+  }
+
+  /** Ribs running down a wave's face at this X, about -1.5 to 1.5. Visual only. */
+  rib(w: Wave, x: number): number {
+    return Math.sin(x * 0.55 + w.id * 1.7) * Math.sin(x * 0.21 - w.id) + 0.5 * Math.sin(x * 1.3 + this.time * 0.8 + w.id);
   }
 
   /** Small background chop so flat water still has some life. */
@@ -239,7 +269,7 @@ export class WaveSystem {
    * Full surface detail for the ocean mesh.
    *
    * `pre` is an optional speed-up: the along-shore amp and foam of every wave
-   * at this X, laid out as [amp0, foam0, amp1, foam1, ...] starting at
+   * at this X, laid out as [amp0, foam0, rib0, amp1, foam1, rib1, ...] starting at
    * `preAt`. The mesh fills it once per column instead of once per vertex.
    */
   sample(x: number, z: number, out: SurfaceSample, pre?: Float32Array, preAt = 0, base?: number): void {
@@ -253,6 +283,7 @@ export class WaveSystem {
     let foam = 0;
     let curl = 0;
     let rise = 0;
+    let bowl = 0;
     for (let i = 0; i < waves.length; i++) {
       const w = waves[i];
       const d = z - w.crestZ;
@@ -260,8 +291,8 @@ export class WaveSystem {
       let amp: number;
       let wFoam: number;
       if (pre) {
-        amp = pre[preAt + i * 2];
-        wFoam = pre[preAt + i * 2 + 1];
+        amp = pre[preAt + i * 3];
+        wFoam = pre[preAt + i * 3 + 1];
       } else {
         const a = this.alongShore(w, x);
         amp = a.amp;
@@ -270,6 +301,12 @@ export class WaveSystem {
       const k = d >= 0 ? d / w.faceWidth : d / T.backWidth;
       const shape = Math.exp(-k * k);
       h += amp * shape;
+      // Ribs running down the face and a rippled crest line: detail only, the physics never sees it.
+      if (amp > 1 && shape > 0.08) {
+        const rib = pre ? pre[preAt + i * 3 + 2] : this.rib(w, x);
+        h += T.faceDetail * amp * shape * (1 - shape * 0.5) * rib * (1 - wFoam);
+      }
+      if (shape > 0.3) bowl = Math.max(bowl, shape * clamp((amp / (T.height * (1 + T.peakBonus * 0.5)) - 1) * 3, 0, 1));
       rise = Math.max(rise, shape * Math.min(1, amp / (T.height * 0.6)));
       // Whitewater: on the crest and tumbling down the front of broken sections.
       if (wFoam > 0.01) {
@@ -294,6 +331,7 @@ export class WaveSystem {
     out.foam = foam;
     out.curl = curl * fade;
     out.rise = rise;
+    out.bowl = bowl;
   }
 
   /**

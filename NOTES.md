@@ -155,6 +155,29 @@ Points:
   shop prices are set.
 - Points are not saved yet. Saving comes with the shop in milestone 3.
 
+### Changes after the milestone 2 playtest
+
+- **Tail lights are subtle now.** They are almost invisible at cruising speed and only light up
+  fully well past the board's pumped top speed, so mostly on big launches and air kicks
+  (`trail.startFraction`, `trail.fullFraction`).
+- **Landings skim.** A landing keeps all of its speed, and for 3 seconds afterwards flat-water
+  drag is cut to 12%, easing back (`air.landGlideTime`, `air.landGlideDrag`). Landing against an
+  oncoming face still costs speed, and climbing a slope still slows the board.
+- **The barrel is a real curl.** The lip is now an arch that rises off the crest, goes over the
+  face and hangs down in front, with ribs and a ragged falling edge. It is slightly see-through
+  so the rider stays visible.
+- **No jumping through the barrel.** Jumping or launching while the lip is overhead is a
+  wipeout ("HIT THE LIP!"). Everywhere else on the wave jumps work as before.
+- **Waves vary.** Each wave is up to 10% bigger or smaller, and has three taller bowl sections
+  at random spots along it. Bowls glow a sunlit green. On a bowl the board accelerates harder
+  and its top speed rises with the extra height (`surf.bowlSpeed`), so hunting for bowls is how
+  to build speed for a big launch. Settings are with the wave tuning (`bowlGain`, `bowlWidth`...).
+- **More wave detail.** Finer sea mesh, ribs down the wave faces, colour streaks, and a ragged
+  edge on the whitewater. Sea plus lip update costs about 5 ms a frame on the test machine's CPU.
+- Scripts re-run after these changes: out-the-back launches and wave hops on all four boards,
+  the barrel (3 s), a jump inside the barrel (wipes out), the five wave tricks, the banked combo,
+  and the points-per-minute session (still about 1,100 on the Foamie).
+
 ## Controls (final layout so far)
 
 | Key | In the water | On a wave | In the air |
@@ -224,7 +247,7 @@ add its wave settings to `config.ts`, and add one line to `src/levels/index.ts`.
   plan is to swap in CC0 models (Kenney, Quaternius) when the walkable world is built in
   milestone 3. `CREDITS.md` lists what is used.
 - **The barrel is simple.** The lip is a curved sheet over the pocket and the scoring is a zone
-  check. There is no closed tube to see down, and nothing knocks the rider off for touching the lip.
+  check. The lip you see is not a solid object: the only thing it does to the rider is wipe out a jump made underneath it.
 - **No sound.** That is milestone 5.
 - **The player starts in the water** just inside the lineup. Starting on the pier comes with
   the world in milestone 3.
