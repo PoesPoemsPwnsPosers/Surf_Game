@@ -54,6 +54,7 @@ class Game {
     });
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Escape') this.togglePause();
+      if ((e.code === 'Enter' || e.code === 'NumpadEnter') && (this.mode === 'ready' || this.mode === 'paused')) this.onOverlayButton();
     });
     // Leaving pointer lock (the browser does this on Esc) pauses the game.
     document.addEventListener('pointerlockchange', () => {
