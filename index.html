@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Surf Game: Venice Beach</title>
+    <link rel="stylesheet" href="/src/ui/style.css" />
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+
+    <div id="hud" class="hidden">
+      <div id="set-timer">
+        <div id="set-label">NEXT SET</div>
+        <div id="set-bar"><div id="set-fill"></div></div>
+        <div id="set-pips"></div>
+      </div>
+      <div id="banner"></div>
+      <div id="prompt"></div>
+      <div id="speed"><span id="speed-value">0</span><span class="unit">mph</span></div>
+      <div id="hint"></div>
+    </div>
+
+    <div id="overlay" class="overlay">
+      <div class="panel">
+        <h1 id="overlay-title">Venice Beach</h1>
+        <p id="overlay-sub">Loading…</p>
+        <div class="controls">
+          <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Paddle. On a wave: A and D carve, W leans in for speed, S stalls.</span></div>
+          <div><kbd>Space</kbd><span>Pop up when a wave reaches you. On a wave: jump. Ride up the face fast to launch off the lip.</span></div>
+          <div><kbd>Shift</kbd><span>Pump for speed (paddle faster in the water).</span></div>
+          <div><kbd>Q</kbd><kbd>E</kbd><span>In the air: spin left and right.</span></div>
+          <div><kbd>W</kbd><kbd>S</kbd><span>In the air: front flip and back flip. Let go to level out before you land.</span></div>
+          <div><kbd>Mouse</kbd><span>Look around.</span></div>
+          <div><kbd>Esc</kbd><span>Pause.</span></div>
+        </div>
+        <button id="overlay-button" disabled>Loading…</button>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
