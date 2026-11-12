@@ -87,10 +87,10 @@ How the boards compare in scripted playtests (same wave, same inputs):
 
 | Board | Trim speed | Pumped speed | Air time off the lip | Reaches the next wave |
 | --- | --- | --- | --- | --- |
-| Foamie | 26 mph | 36 mph | about 1.6 s | Only with a pump and an air kick |
-| Fish | 32 mph | 44 mph | about 1.7 s | With a pump |
-| Shortboard | 38 mph | 53 mph | about 1.9 s | Yes, without pumping |
-| Pro Gun | 43 mph | 62 mph | about 2.0 s | Yes, without pumping |
+| Foamie | 26 mph | 38 mph | about 1.6 s | Only with a pump and an air kick |
+| Fish | 32 mph | 46 mph | about 1.7 s | With a pump |
+| Shortboard | 38 mph | 56 mph | about 1.9 s | Yes, without pumping |
+| Pro Gun | 43 mph | 66 mph | about 2.0 s | Yes, without pumping |
 
 Speeds are along the board; the speed readout in the game also includes the wave carrying you.
 
