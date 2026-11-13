@@ -58,9 +58,10 @@ export class ShopPanel {
         html += `<div class="shop-group">${group}</div>`;
       }
       const label =
-        it.status === 'equipped' ? 'In use' : it.status === 'owned' ? 'Use' : it.status === 'done' ? 'Done' : it.price === 0 ? 'Free' : `Buy · ${fmt(it.price)}`;
+        it.label ??
+        (it.status === 'equipped' ? 'In use' : it.status === 'owned' ? 'Use' : it.status === 'done' ? 'Done' : it.price === 0 ? 'Free' : `Buy · ${fmt(it.price)}`);
       const short = it.status === 'poor' ? `<span class="short">${fmt(it.price - points)} more needed</span>` : '';
-      const off = it.status === 'equipped' || it.status === 'done' || it.status === 'poor';
+      const off = it.status === 'equipped' || it.status === 'done' || it.status === 'poor' || it.status === 'locked';
       html +=
         `<div class="shop-row ${it.status}"><div class="shop-text"><b>${it.name}</b><span>${it.blurb}</span>${short}</div>` +
         `<button data-id="${it.id}"${off ? ' disabled' : ''}>${label}</button></div>`;

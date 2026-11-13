@@ -128,3 +128,13 @@ button.quiet { background: transparent; color: var(--ink); box-shadow: none; fon
 #loadout .heart { color: var(--coral); }
 .boost { display: inline-block; width: 64px; height: 9px; border-radius: 5px; background: rgba(255, 255, 255, 0.28); overflow: hidden; }
 .boost > span { display: block; height: 100%; width: 100%; background: var(--coral); }
+
+/* Boss fight */
+#boss { position: absolute; left: 50%; top: 104px; transform: translateX(-50%); width: min(460px, 60vw); text-align: center; display: none; }
+#boss.on { display: block; }
+#boss-name { font-weight: 900; font-style: italic; letter-spacing: 0.14em; font-size: 16px; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35); }
+#boss-bar { height: 14px; border-radius: 7px; background: rgba(13, 43, 69, 0.55); border: 2px solid #fff; margin-top: 4px; overflow: hidden; }
+#boss-fill { height: 100%; width: 100%; background: #9b6bff; transition: width 0.12s; }
+#boss.angry #boss-fill { background: var(--coral); }
+#boss.angry #boss-name { color: var(--coral); }
+#loadout .heart.lost { opacity: 0.3; }

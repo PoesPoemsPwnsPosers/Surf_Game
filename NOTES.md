@@ -22,8 +22,9 @@ Other commands: `npm run build` (type check and production build), `npm run type
 | 1. Surfing feel | Built and playtested |
 | 1.5. Feel update: boards, wave tricks, flying out the back | Built and playtested |
 | 2. Points, combos, on-screen score | Built and playtested |
-| 3. Venice Beach world, walking, shop, saving | **Built. Waiting for playtest.** |
-| 4. Stingray boss | Not started |
+| 3. Venice Beach world, walking, shop, saving | Built and playtested |
+| 3.5. Air update: tricks on the arrow keys, booster, faster drop-ins | **Built. Waiting for playtest.** |
+| 4. Stingray boss | **Built. Waiting for playtest.** |
 | 5. Polish: sound, title and controls screens, performance | Not started |
 
 ## What is built (milestone 1)
@@ -70,7 +71,7 @@ of the fun happens in the air.
   it flies over the back of the wave toward the ocean. A big lip still throws you back onto the
   face: that means the tallest part of the peak, or the pitching section right next to the
   whitewater. A diagonal hit also drops back onto the face, as before.
-- **Air control.** A and D steer the flight. Shift+W stretches it and Shift+S shortens it.
+- **Air control.** A and D steer the flight. (Shift+W and Shift+S used to stretch and shorten it; see the air update below for the booster and air brake that replaced them.)
   **F** or the right mouse button grabs the rail. Spins and flips are unchanged.
 - **Air kick.** Space in the air gives extra height and distance. It costs one charge. You
   start with one, and earn more by landing air tricks, doing wave tricks, and pumping past the
@@ -209,10 +210,11 @@ The shop (stand on the yellow mat, press F; the game pauses while it is open):
 | Shortboard | 4,000 | |
 | Pro Gun | 8,000 | |
 | Extra heart, 3 levels | 1,000 / 2,500 / 4,500 | 3 hearts to start, up to 6. For the boss fight |
-| Super Squirter | 5,000 | Weapons do nothing until the boss fight (milestone 4) |
-| Coconut Cannon | 6,000 | |
-| Trident Launcher | 7,000 | |
-| Stingray Showdown | 12,000 | The boss fight. Buying it is recorded; the fight is milestone 4 |
+| Super Squirter | 5,000 | 6 shots a second, 1 damage each |
+| Coconut Cannon | 6,000 | 1 shot a second, 9 damage |
+| Trident Launcher | 7,000 | 3 shots in a spread, 2.5 times a second, 1.4 damage each |
+| Booster I / II / III | 2,000 / 5,000 / 9,000 | Hold Shift in the air: 0.9 / 1.5 / 2.4 s of thrust. Refills on touching down |
+| Stingray Showdown | 12,000 | The boss fight. Bought once; after that the row is a Fight! button, as often as you like |
 
 - **Boards replace the Speed and Balance upgrades**, as recommended after milestone 1.5: each
   board is faster and more forgiving than the last. Health stays as its own upgrade. Owned
@@ -251,25 +253,76 @@ What was wrong and what changed:
 - **Also noted:** `ui/hud.ts` builds its hint text from the surfer's state with a switch; fine at
   this size, but the boss fight's health bar should be its own small class, not more of the HUD.
 
+## What is built (milestone 3.5, air update)
+
+Changes asked for after the milestone 3 playtest. Numbers are in `air`, `surf`, `booster` and
+`keys` in `src/config.ts`.
+
+- **Spins and flips are on the arrow keys.** Left and right spin, up and down flip. W, S, Q and
+  E no longer do tricks in the air, so steering (A / D) and tricks do not fight each other.
+- **Booster.** The old Shift+W stretch is now something you buy. Three levels in the shop.
+  Hold Shift in the air for thrust along the flight and some lift; the tank refills the moment
+  the board touches water or land. A bar next to the air kicks shows what is left. The light
+  trail burns at full strength while boosting. Scripted flights off the same wave: no booster
+  26 m, Booster I 57 m, Booster III 115 m.
+- **S is an air brake**, to drop short on purpose.
+- **Dropping back in is fast.** Riding down the face gives extra drive (`surf.dropBoost`), more
+  again for the first seconds after a landing (`surf.landDropBoost`), and the speed limit is
+  lifted for a moment after landing (`surf.landTopSpeed`), so a landing flows into the next launch.
+
+## What is built (milestone 4, the Stingray)
+
+Numbers are in `boss` and `shop.weapons` in `src/config.ts`. Rules are in `src/game/boss.ts`,
+drawing in `src/fx/bossView.ts`.
+
+- **Starting it.** Buy the Stingray Showdown and at least one weapon at the shop. The boss row
+  then becomes a Fight! button. It puts the surfer in the water by the buoys and the Stingray
+  rises out of the sea.
+- **The Stingray** hovers about 28 m ahead of the surfer and weaves from side to side. It has
+  260 health, shown in a bar under the set timer.
+- **Shooting.** Hold the left mouse button while riding a wave or in the air. Shots aim
+  themselves and lead the target. Shots from the air do 1.5 times the damage. No shooting while
+  paddling, so staying up on waves is the fight.
+- **Tail strikes.** A red ring appears on the water and fills in; when it is full the strike
+  lands. A surfer inside the ring and near the water loses a heart. Carve out of it, or be
+  1.8 m or more in the air. After a hit there are 1.6 s of safety. It only attacks a surfer who
+  is riding.
+- **Phase 1:** one strike every 3.2 s with a 1.25 s warning.
+  **Phase 2** (at half health): it turns red, comes closer, moves faster, and lands three
+  rings in a row every 2.1 s with a 1.0 s warning.
+- **Hearts** are the ones bought in the shop (3 to 6), shown bottom right, and they are full again for each fight.
+- **Losing** (no hearts left): "The Stingray wins. You keep your points." Nothing is lost and
+  the Fight! button is still there.
+- **Winning:** "VICTORY! MAVERICKS UNLOCKED", 3,000 cool points, and the save records Mavericks
+  as unlocked (the shop shows it). Mavericks itself is not built. The fight can be replayed.
+- Scripted checks: a hands-off rider with the Squirter loses all 3 hearts by phase 2 and keeps
+  their points; a rider who cannot die wins with the Trident in about a minute of riding and
+  gets the reward and the unlock. The Fight! button in the shop was clicked by a script and starts the fight.
+  Dodging by carving or jumping was not driven by a script, and no person has played the fight yet, so the
+  difficulty is a first guess.
+
 ## Controls (final layout so far)
 
 On land: WASD walk, Shift run, Space hop, F opens the shop from the yellow mat on the pier.
 
 | Key | In the water | On a wave | In the air |
 | --- | --- | --- | --- |
-| W | Paddle forward (away from the camera) | Lean in for a little extra speed | Front flip |
-| S | Paddle back | Stall (brake). Next to the whitewater this is how to get barrelled | Back flip |
+| W | Paddle forward (away from the camera) | Lean in for a little extra speed | |
+| S | Paddle back | Stall (brake). Next to the whitewater this is how to get barrelled | Air brake: slow the flight and drop short |
 | A / D | Paddle left / right | Carve left / right | Steer the flight |
 | Space | Pop up when a wave reaches you | Jump | Air kick (needs a charge) |
-| Shift | Sprint paddle | Pump for speed | With W / S: stretch or shorten the flight |
-| Q | | Cutback. W+Q hang ten, S+Q tail slide | Spin left |
-| E | | Snap. W+E floater | Spin right |
+| Shift | Sprint paddle | Pump for speed | Booster, if one is owned |
+| Q | | Cutback. W+Q hang ten, S+Q tail slide | |
+| E | | Snap. W+E floater | |
+| Left / Right arrow | | | Spin left / right |
+| Up / Down arrow | | | Front flip / back flip |
+| Left mouse (hold) | | Shoot, during the boss fight | Shoot, during the boss fight |
 | F or right mouse | | | Grab |
 | Mouse | Look around | Nudge the view | Nudge the view |
 | Esc | Pause | Pause | Pause |
 
-Not wired up yet: **left click** (shoot, milestone 4).
-Left click is kept free for shooting, which is why the grab is on F and the right button.
+Left click shoots, which is why the grab is on F and the right button.
+The trick, booster and air brake keys are named in `keys` in `src/config.ts` and can be changed there.
 
 The same list is on the start and pause screens in the game.
 
@@ -299,6 +352,7 @@ src/
   game/score.ts           cool points, combo, multiplier, banking
   game/shop.ts            what the shop sells and what buying does
   game/save.ts            reading and writing the save in the browser
+  game/boss.ts            the Stingray fight: health, phases, strikes, shots, hearts
   core/input.ts           keyboard and mouse
   core/level.ts           what a level has to provide (waves, colours, land, scenery)
   levels/index.ts         level list; each level is loaded on demand as its own chunk
@@ -314,6 +368,7 @@ src/
   fx/surfEffects.ts       spray, light trail, shadow and landing ring
   fx/particles.ts         spray particles
   fx/trail.ts             tail light trails
+  fx/bossView.ts          draws the Stingray, the shots and the warning rings
   ui/hud.ts, style.css    on-screen display
   ui/shopPanel.ts         the shop screen
 ```
@@ -333,7 +388,9 @@ add its wave settings to `config.ts`, and add one line to `src/levels/index.ts`.
 - **No sound.** That is milestone 5.
 - **Nothing on land is solid except the ground.** Railings, the shop hut, palms and towers can
   be walked through, and a surfer can ride straight through the pier's pilings.
-- **Weapons and the boss ticket can be bought but do nothing yet.** That is milestone 4.
+- **Shots aim themselves.** Holding the left mouse button fires at the Stingray wherever the
+  camera points. Free aiming with the mouse is not built; say if you want it.
+- **The Stingray is a placeholder model built in code**, like everything else.
 - **Feel was tuned with scripted playtests, not by hand.** Scripts drove the real game in a
   browser and checked the results and screenshots. Milestone 1: paddle out, pop up, trim, pump,
   launch off the lip, backflip, 180 spin, a forced wipeout, pause and resume. Milestone 1.5:
@@ -361,4 +418,4 @@ add its wave settings to `config.ts`, and add one line to `src/levels/index.ts`.
 
 ## What is left
 
-Milestones 4 and 5 in the table above, in that order.
+Milestone 5 (polish: sound, title and controls screens, performance).

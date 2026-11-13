@@ -19,6 +19,8 @@ export interface SaveData {
   weapon: string | null;
   /** The boss fight has been bought. */
   bossTicket: boolean;
+  /** The Stingray has been beaten, which unlocks the next beach. */
+  mavericksUnlocked: boolean;
 }
 
 const KEY = 'surf-game.save.v1';
@@ -35,6 +37,7 @@ export function newSave(): SaveData {
     weapons: [],
     weapon: null,
     bossTicket: false,
+    mavericksUnlocked: false,
   };
 }
 
@@ -61,6 +64,7 @@ export function loadSave(): SaveData {
       weapons,
       weapon: d.weapon && weapons.includes(d.weapon) ? d.weapon : (weapons[0] ?? null),
       bossTicket: d.bossTicket === true,
+      mavericksUnlocked: d.mavericksUnlocked === true,
     };
   } catch {
     // Storage can be blocked (private windows, embedded pages). The game still works, it just forgets.

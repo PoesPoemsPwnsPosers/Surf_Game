@@ -19,6 +19,10 @@ export class Hud {
   private boardName = el('board-name');
   private kicks = el('kicks');
   private loadout = el('loadout');
+  private boss = el('boss');
+  private bossName = el('boss-name');
+  private bossFill = el('boss-fill');
+  private fighting = false;
   private lastLoadout = '';
   private lastKicks = '';
   private overlay = el('overlay');
@@ -84,11 +88,26 @@ export class Hud {
   }
 
   /** Hearts and the weapon in hand, under the board name. */
-  setLoadout(hearts: number, weapon: string | null): void {
-    const key = `${hearts}:${weapon}`;
+  setLoadout(hearts: number, weapon: string | null, lost = 0): void {
+    const key = `${hearts}:${weapon}:${lost}`;
     if (key === this.lastLoadout) return;
     this.lastLoadout = key;
-    this.loadout.innerHTML = `<span class="heart">${'♥'.repeat(hearts)}</span>${weapon ? ` · ${weapon}` : ''}`;
+    this.loadout.innerHTML = `<span class="heart">${'♥'.repeat(Math.max(0, hearts))}</span><span class="heart lost">${'♥'.repeat(Math.max(0, lost))}</span>${weapon ? ` · ${weapon}` : ''}`;
+  }
+
+  /** The Stingray's health bar. A fraction below zero hides it. */
+  setBoss(fraction: number, phase: number): void {
+    const on = fraction >= 0;
+    if (on !== this.fighting) {
+      this.fighting = on;
+      this.boss.classList.toggle('on', on);
+      this.lastHint = '';
+    }
+    if (!on) return;
+    this.bossFill.style.width = `${(fraction * 100).toFixed(1)}%`;
+    this.boss.classList.toggle('angry', phase === 2);
+    const label = phase === 2 ? `${CONFIG.boss.name.toUpperCase()} · PHASE 2` : CONFIG.boss.name.toUpperCase();
+    if (label !== this.bossName.textContent) this.bossName.textContent = label;
   }
 
   /**
@@ -181,6 +200,11 @@ export class Hud {
       case 'wipeout':
         hint = 'Shake it off…';
         break;
+    }
+    if (this.fighting && (surfer.state === 'surf' || surfer.state === 'air')) {
+      hint += '<br><b>Hold left mouse</b> to shoot the Stingray · get out of the red rings, or be in the air when they land';
+    } else if (this.fighting && surfer.state === 'paddle') {
+      hint += '<br>Catch a wave: you can only shoot while you are riding';
     }
     if (hint !== this.lastHint) {
       this.hint.innerHTML = hint;

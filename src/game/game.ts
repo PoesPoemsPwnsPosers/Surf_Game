@@ -3,6 +3,7 @@ import { FollowCamera } from '../camera/followCamera';
 import { CONFIG } from '../config';
 import { Input } from '../core/input';
 import type { LevelDefinition, LevelEnvironment } from '../core/level';
+import { BossView } from '../fx/bossView';
 import { SurfEffects } from '../fx/surfEffects';
 import { loadLevel, type LevelId } from '../levels';
 import { LipMesh } from '../ocean/lipMesh';
@@ -11,6 +12,7 @@ import { WaveSystem } from '../ocean/waves';
 import { Surfer, type SurferEvent } from '../player/surfer';
 import { Hud } from '../ui/hud';
 import { ShopPanel } from '../ui/shopPanel';
+import { BossFight, type BossEvent } from './boss';
 import { clearSave, loadSave, newSave, writeSave, type SaveData } from './save';
 import { Score } from './score';
 import { hearts, Shop } from './shop';
@@ -34,6 +36,8 @@ export class Game {
   private lip!: LipMesh;
   private surfer!: Surfer;
   private effects!: SurfEffects;
+  private fight!: BossFight;
+  private bossView!: BossView;
   private env!: LevelEnvironment;
   private level!: LevelDefinition;
   private save: SaveData = loadSave();
@@ -98,7 +102,9 @@ export class Game {
     });
     this.lip = new LipMesh(this.waves, this.level.ocean);
     this.effects = new SurfEffects(this.waves);
-    this.scene.add(this.ocean.farPlane, this.ocean.mesh, this.lip.mesh, this.effects.group);
+    this.fight = new BossFight(this.waves);
+    this.bossView = new BossView(this.waves);
+    this.scene.add(this.ocean.farPlane, this.ocean.mesh, this.lip.mesh, this.effects.group, this.bossView.group);
     this.env = this.level.buildEnvironment(this.scene, this.waves);
     this.surfer = new Surfer(this.waves, this.level.land);
     this.surfer.setBoard(this.save.board);
@@ -171,6 +177,10 @@ export class Game {
   }
 
   private useShopItem(id: string): void {
+    if (id === 'boss' && this.save.bossTicket && this.save.weapon) {
+      this.startFight();
+      return;
+    }
     if (!this.shop.use(id)) return;
     this.score.total = this.save.points;
     this.applyLoadout();
@@ -178,7 +188,57 @@ export class Game {
     this.shopPanel.render(this.shop.items(), this.save.points, this.saved);
   }
 
+  /** Leave the shop and start the Stingray fight out in the water. */
+  private startFight(): void {
+    const weapon = CONFIG.shop.weapons.find((w) => w.id === this.save.weapon);
+    if (!weapon) return;
+    this.closeShop();
+    this.surfer.placeInWater();
+    this.surfer.events.length = 0;
+    this.fight.start(hearts(this.save), weapon, this.surfer);
+    this.hud.setLoadout(this.fight.hearts, weapon.name);
+    this.hud.flash(CONFIG.boss.name.toUpperCase(), 'bad', 2.4);
+  }
+
+  private onBossEvent(e: BossEvent): void {
+    const weapon = this.fight.weapon ? this.fight.weapon.name : null;
+    switch (e.type) {
+      case 'bossHit':
+        this.bossView.hit(this.fight);
+        break;
+      case 'phase2':
+        this.hud.flash('PHASE 2: IT IS ANGRY!', 'bad', 2.2);
+        this.cam.addShake(0.5);
+        break;
+      case 'strike':
+        this.bossView.strike(e.x, e.z);
+        break;
+      case 'playerHit':
+        this.hud.setLoadout(e.heartsLeft, weapon, this.fight.maxHearts - e.heartsLeft);
+        if (e.heartsLeft > 0) this.hud.flash('STUNG!', 'bad', 1);
+        this.cam.addShake(0.8);
+        break;
+      case 'lost':
+        // Losing costs nothing: the points and the ticket are kept.
+        this.hud.flash('THE STINGRAY WINS. You keep your points.', 'bad', 4);
+        this.applyLoadout();
+        break;
+      case 'won': {
+        const first = !this.save.mavericksUnlocked;
+        this.save.mavericksUnlocked = true;
+        this.score.total += CONFIG.boss.reward;
+        this.hud.popup({ text: 'Stingray beaten', points: CONFIG.boss.reward, kind: 'move' });
+        this.hud.flash(first ? 'VICTORY! MAVERICKS UNLOCKED' : 'VICTORY!', 'good', 5);
+        this.cam.addShake(0.6);
+        this.applyLoadout();
+        this.persist();
+        break;
+      }
+    }
+  }
+
   private resetProgress(): void {
+    this.fight.cancel();
     clearSave();
     Object.assign(this.save, newSave());
     this.score.total = this.save.points;
@@ -226,6 +286,7 @@ export class Game {
     if (this.input.wasPressed('KeyF') && this.atShop()) this.openShop();
     this.surfer.step(step, this.input, this.cam.yaw);
     this.score.update(step, this.surfer);
+    this.fight.step(step, this.surfer, this.input);
     this.input.consumePresses();
   }
 
@@ -247,6 +308,8 @@ export class Game {
     const before = this.score.total;
     for (const e of this.surfer.events) this.onSurferEvent(e);
     this.surfer.events.length = 0;
+    for (const e of this.fight.events) this.onBossEvent(e);
+    this.fight.events.length = 0;
     // Points are saved whenever the banked total changes.
     if (this.score.total !== before) this.persist();
   }
@@ -274,7 +337,9 @@ export class Game {
     if (playing) this.env.update(dt, this.waves.time);
     this.cam.update(dt, this.surfer, this.input, this.floorAt);
     this.effects.update(live, this.surfer, this.cam.camera.position);
+    this.bossView.update(live, this.fight, this.surfer.pos.x, this.surfer.pos.y, this.surfer.pos.z);
     if (this.mode !== 'loading') {
+      this.hud.setBoss(this.fight.active ? this.fight.hp / this.fight.maxHp : -1, this.fight.phase);
       this.hud.update(dt, this.surfer, this.waves, this.score, playing && this.atShop() ? 'F: SURF SHOP' : '');
     }
     this.renderer.render(this.scene, this.cam.camera);
@@ -295,10 +360,12 @@ export class Game {
         this.effects.update(step * 2, this.surfer, this.cam.camera.position);
       }
       this.log.push(...this.surfer.events);
+      this.bossLog.push(...this.fight.events);
       this.drainEvents();
     }
   }
   readonly log: SurferEvent[] = [];
+  readonly bossLog: BossEvent[] = [];
   private simTick = 0;
   get debug() {
     return {
@@ -312,6 +379,8 @@ export class Game {
       cam: this.cam,
       ocean: this.ocean,
       lip: this.lip,
+      fight: this.fight,
+      startFight: () => this.startFight(),
     };
   }
 }

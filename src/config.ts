@@ -534,11 +534,48 @@ export const CONFIG = {
     /** Weapons, used in the boss fight (milestone 4). Each is about five minutes of average play. */
     weapons: [
       { id: 'squirter', name: 'Super Squirter', price: 5000, blurb: 'Fast water pistol. Low damage, never stops.', damage: 1, shotsPerSecond: 6 },
-      { id: 'coconut', name: 'Coconut Cannon', price: 6000, blurb: 'Slow, heavy coconuts that hit hard.', damage: 6, shotsPerSecond: 1 },
-      { id: 'trident', name: 'Trident Launcher', price: 7000, blurb: 'Three shots at once in a spread.', damage: 2, shotsPerSecond: 2.5 },
+      { id: 'coconut', name: 'Coconut Cannon', price: 6000, blurb: 'Slow, heavy coconuts that hit hard.', damage: 9, shotsPerSecond: 1 },
+      { id: 'trident', name: 'Trident Launcher', price: 7000, blurb: 'Three shots at once in a spread.', damage: 1.4, shotsPerSecond: 2.5 },
     ],
     /** The boss fight. The most expensive thing in the shop. */
     boss: { name: 'Stingray Showdown', price: 12000, blurb: 'Take on the Stingray. Beat it to unlock Mavericks.' },
+  },
+
+  /** The Stingray boss fight. */
+  boss: {
+    name: 'The Stingray',
+    hp: 260,
+    /** Phase 2 starts when health falls to this fraction. */
+    phase2At: 0.5,
+    /** Where it hovers: metres ahead of the surfer, and height above the water. Closer in phase 2. */
+    distance: 28,
+    distance2: 21,
+    height: 7,
+    /** How far it weaves side to side (metres) and how quickly it follows the surfer. */
+    weave: 15,
+    follow: 1.5,
+    follow2: 2.4,
+    /** Shots that pass within this distance of its centre hit (metres). */
+    hitRadius: 3.6,
+    /** Seconds between tail strikes, and the warning time before each one lands. Phase 1, then phase 2. */
+    strikeEvery: 3.2,
+    strikeEvery2: 2.1,
+    strikeDelay: 1.25,
+    strikeDelay2: 1.0,
+    /** A strike hits a surfer within this distance of it (metres). Phase 2 lands three, this far apart. */
+    strikeRadius: 3.2,
+    strikeSpread2: 7,
+    /** A surfer this high above the water is out of reach of a strike (metres). */
+    safeHeight: 1.8,
+    /** Seconds of safety after losing a heart. */
+    invulnerable: 1.6,
+    /** Speed of the player's shots (m/s), how much they scatter (radians), and the bonus for shooting from the air. */
+    shotSpeed: 75,
+    shotScatter: 0.035,
+    tridentSpread: 0.07,
+    airDamageBonus: 1.5,
+    /** Cool points for winning. */
+    reward: 3000,
   },
 
   /**

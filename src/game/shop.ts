@@ -9,7 +9,9 @@ export interface ShopItem {
   blurb: string;
   price: number;
   /** 'buy' can be bought now, 'poor' costs too much, 'owned' can be equipped, 'equipped' is in use, 'done' has nothing left to do. */
-  status: 'buy' | 'poor' | 'owned' | 'equipped' | 'done';
+  status: 'buy' | 'poor' | 'owned' | 'equipped' | 'done' | 'locked';
+  /** Button text, when the usual one for the status does not fit. */
+  label?: string;
 }
 
 /** Hearts the player has for the boss fight. */
@@ -73,9 +75,25 @@ export class Shop {
       id: 'boss',
       group: 'Boss fight',
       name: S.boss.name,
-      blurb: s.bossTicket ? 'Bought. The fight itself arrives in the next update.' : S.boss.blurb,
+      blurb: !s.bossTicket
+        ? S.boss.blurb
+        : !s.weapon
+          ? 'You need a weapon before you can fight.'
+          : s.mavericksUnlocked
+            ? 'Beaten. Mavericks is unlocked. Fight again for the reward.'
+            : 'Shoot it while you surf. Losing costs nothing.',
       price: S.boss.price,
-      status: s.bossTicket ? 'done' : afford(S.boss.price),
+      status: !s.bossTicket ? afford(S.boss.price) : s.weapon ? 'owned' : 'locked',
+      label: s.bossTicket ? (s.weapon ? 'Fight!' : 'No weapon') : undefined,
+    });
+    list.push({
+      id: 'mavericks',
+      group: 'Boss fight',
+      name: 'Mavericks',
+      blurb: s.mavericksUnlocked ? 'Unlocked. The beach itself is still being built.' : 'The next beach. Beat the Stingray to unlock it.',
+      price: 0,
+      status: 'locked',
+      label: s.mavericksUnlocked ? 'Unlocked' : 'Locked',
     });
     return list;
   }
@@ -89,7 +107,8 @@ export class Shop {
     if (item.status === 'owned') {
       if (kind === 'board') s.board = Number(arg);
       else if (kind === 'weapon') s.weapon = arg;
-      return true;
+      // The boss row starts the fight; the game handles that.
+      return kind !== 'boss';
     }
     if (item.status !== 'buy') return false;
     s.points -= item.price;
