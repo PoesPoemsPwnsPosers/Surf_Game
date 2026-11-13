@@ -4,7 +4,7 @@ import type { SaveData } from './save';
 /** One row in the shop. */
 export interface ShopItem {
   id: string;
-  group: 'Boards' | 'Health' | 'Weapons' | 'Boss fight';
+  group: 'Boards' | 'Booster' | 'Health' | 'Weapons' | 'Boss fight';
   name: string;
   blurb: string;
   price: number;
@@ -38,6 +38,17 @@ export class Shop {
         price: S.boardPrices[i] ?? 0,
         status: s.board === i ? 'equipped' : s.boardsOwned[i] ? 'owned' : afford(S.boardPrices[i] ?? 0),
       });
+    });
+    const nextBoost = CONFIG.booster[s.booster];
+    list.push({
+      id: 'booster',
+      group: 'Booster',
+      name: nextBoost ? nextBoost.name : `${CONFIG.booster[s.booster - 1].name} (max)`,
+      blurb: nextBoost
+        ? `Hold Shift in the air to boost for ${nextBoost.seconds} seconds. Refills when you touch down.`
+        : 'The longest, strongest boost there is.',
+      price: nextBoost ? nextBoost.price : 0,
+      status: nextBoost ? afford(nextBoost.price) : 'done',
     });
     const maxed = s.health >= S.healthPrices.length;
     list.push({
@@ -87,6 +98,8 @@ export class Shop {
       s.board = Number(arg);
     } else if (kind === 'health') {
       s.health++;
+    } else if (kind === 'booster') {
+      s.booster++;
     } else if (kind === 'weapon') {
       s.weapons.push(arg);
       s.weapon = arg;

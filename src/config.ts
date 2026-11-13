@@ -260,6 +260,11 @@ export const CONFIG = {
     slideRate: 3,
     /** Drag once the wave has left the board behind (per second). */
     offWaveDrag: 1.4,
+    /** Going down the face builds speed this much faster than plain gravity would. */
+    dropBoost: 1.5,
+    /** Fresh off a landing, the drop is this much stronger again and top speed is lifted by `landTopSpeed`, fading with the landing glide. */
+    landDropBoost: 1.6,
+    landTopSpeed: 0.3,
     /** Riding a taller section than usual raises top speed and drive by this much per unit of extra height. */
     bowlSpeed: 0.9,
     /** The ride ends when the board is off the wave and slower than this. */
@@ -342,8 +347,8 @@ export const CONFIG = {
 
     // --- Shift in the air: lean to speed up or slow down instead of flipping ---
     /** Slowest and fastest the surfer can make the flight with Shift + S / W (multiples of launch speed). */
+    /** The air brake (S) can slow a flight down to this fraction of its launch speed. */
     driftMinSpeed: 0.35,
-    driftMaxSpeed: 1.5,
     /** A grab has to be held this long to count. */
     grabMinTime: 0.35,
   },
@@ -535,6 +540,30 @@ export const CONFIG = {
     /** The boss fight. The most expensive thing in the shop. */
     boss: { name: 'Stingray Showdown', price: 12000, blurb: 'Take on the Stingray. Beat it to unlock Mavericks.' },
   },
+
+  /**
+   * Keys for air tricks, by KeyboardEvent.code. Spins and flips have their own keys so they
+   * never clash with steering, braking or the booster.
+   */
+  keys: {
+    spinLeft: 'ArrowLeft',
+    spinRight: 'ArrowRight',
+    flipForward: 'ArrowUp',
+    flipBack: 'ArrowDown',
+    /** Hold in the air to slow the flight and drop short. */
+    airBrake: 'KeyS',
+  },
+
+  /**
+   * The booster: hold Shift in the air to fire it. It pushes the board along its flight and
+   * holds it up a little. The tank refills when the board touches down. Level 0 is no booster;
+   * the levels below are sold in the shop in order.
+   */
+  booster: [
+    { name: 'Booster I', price: 2000, seconds: 0.9, thrust: 13, topSpeed: 1.35, lift: 0.15 },
+    { name: 'Booster II', price: 5000, seconds: 1.5, thrust: 17, topSpeed: 1.6, lift: 0.3 },
+    { name: 'Booster III', price: 9000, seconds: 2.4, thrust: 22, topSpeed: 1.9, lift: 0.45 },
+  ],
 
   /** Test switches. Leave these off for real play. */
   debug: {

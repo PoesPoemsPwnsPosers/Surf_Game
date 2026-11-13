@@ -190,6 +190,10 @@ export class Game {
   /** Make the game match the save: the board under the surfer's feet, hearts and weapon on screen. */
   private applyLoadout(): void {
     if (this.surfer.boardTier !== this.save.board) this.surfer.setBoard(this.save.board);
+    if (this.surfer.boosterLevel !== this.save.booster) {
+      this.surfer.boosterLevel = this.save.booster;
+      this.surfer.refillBooster();
+    }
     this.surfer.events.length = 0;
     const weapon = CONFIG.shop.weapons.find((w) => w.id === this.save.weapon);
     this.hud.setLoadout(hearts(this.save), weapon ? weapon.name : null);

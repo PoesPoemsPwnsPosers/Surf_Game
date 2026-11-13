@@ -57,6 +57,9 @@ export class SurfEffects {
       case 'kick':
         this.spray.burst(p.x, p.y, p.z, 18, 4);
         return 0.18;
+      case 'boost':
+        this.spray.burst(p.x, p.y, p.z, 12, 5);
+        return 0.12;
       case 'wipeout':
         this.spray.burst(p.x, p.y, p.z, 50, 8);
         return 0.9;
@@ -130,7 +133,7 @@ export class SurfEffects {
     // Barely there at cruising speed; it only really lights up when the board is flying.
     const from = b.maxSpeed * T.startFraction;
     const lin = Math.min(1, Math.max(0, (s.displaySpeed - from) / (b.maxSpeed * T.fullFraction - from)));
-    const power = lin * lin;
+    const power = s.boosting ? 1 : lin * lin;
     this.trail.update(dt, riding && power > 0.01, this.tailL, this.tailR, power, cameraPos, this.surfaceAt);
   }
 

@@ -36,6 +36,8 @@ export type SurferEvent =
   /** Came off the top of the curling lip after riding it for `time` seconds. */
   | { type: 'lipRide'; time: number }
   | { type: 'kick' }
+  /** The booster fired. */
+  | { type: 'boost' }
   | { type: 'spray'; power: number }
   | { type: 'board'; name: string }
   | { type: 'wipeout'; reason: 'landing' | 'foam' | 'lip' }
@@ -135,6 +137,19 @@ export class Surfer {
   private landSide = 1;
   /** 1 on a normal stretch of wave, more on a taller bowl section. */
   bowlBoost = 1;
+  /** Booster level (0 is none) and the fuel left in its tank, in seconds. Set from the save by the game. */
+  boosterLevel = 0;
+  boostFuel = 0;
+  boosting = false;
+  get boostSeconds(): number {
+    return this.boosterLevel > 0 ? CONFIG.booster[this.boosterLevel - 1].seconds : 0;
+  }
+  /** Fill the booster tank. Happens every time the board touches down. */
+  refillBooster(): void {
+    this.boostFuel = this.boostSeconds;
+    this.boosting = false;
+  }
+
   /** Banked air kicks. Whole numbers are usable; the fraction is progress to the next. */
   kickCharges = CONFIG.air.kickStartCharges;
 
@@ -282,6 +297,8 @@ export class Surfer {
   }
 
   private setState(s: SurferState): void {
+    // The booster tank refills whenever the board is not in the air.
+    if (s !== 'air') this.refillBooster();
     this.state = s;
     this.stateTime = 0;
   }
@@ -586,7 +603,10 @@ export class Surfer {
     const slopeMag = Math.hypot(gx, gz);
 
     this.pumping = input.isDown('ShiftLeft') || input.isDown('ShiftRight');
-    let accel = -S.slopeGravity * slopeAlong * (slopeAlong > 0 ? S.climbEase : 1);
+    // Dropping down the face is quick, and quicker still straight after a landing, so the next launch comes fast.
+    const fresh = Math.min(1, (this.landGlide / A.landGlideTime) * 2);
+    const drop = S.dropBoost * (1 + (S.landDropBoost - 1) * fresh);
+    let accel = -S.slopeGravity * slopeAlong * (slopeAlong > 0 ? S.climbEase : drop);
     accel += B.trimAccel * Math.min(1, slopeMag) * Math.abs(fx) * this.carry * this.bowlBoost * this.bowlBoost;
     if (this.pumping) accel += B.pumpAccel * (0.3 + 0.7 * near);
     if (input.isDown('KeyW') && !trick) accel += S.leanAccel * near;
@@ -601,7 +621,7 @@ export class Surfer {
     // Taller sections of the wave (bowls) are faster: more top speed while the board is on one.
     const bowl = ws ? 1 + S.bowlSpeed * clamp(ws.localAmp / (T.height * (1 + T.peakBonus * 0.5)) - 1, 0, 0.5) * this.carry : 1;
     this.bowlBoost = bowl;
-    const cap = (this.pumping ? B.pumpMaxSpeed : B.maxSpeed) * capBoost * bowl;
+    const cap = (this.pumping ? B.pumpMaxSpeed : B.maxSpeed) * capBoost * bowl * (1 + S.landTopSpeed * fresh);
     if (this.speed > cap) this.speed -= (this.speed - cap) * Math.min(1, 3 * dt);
 
     // Riding flat out slowly earns an air kick.
@@ -754,20 +774,33 @@ export class Surfer {
       this.airVX = vx;
       this.airVZ = vz;
     }
-    // Shift + W / S: lean forward or back to stretch or shorten the flight (no flip).
-    if (shift) {
-      const lean = input.axis('KeyS', 'KeyW');
+    // Shift: fire the booster (if one is fitted and has fuel). It pushes along the flight and holds the board up.
+    const K = CONFIG.keys;
+    const boost = this.boosterLevel > 0 ? CONFIG.booster[this.boosterLevel - 1] : null;
+    const wasBoosting = this.boosting;
+    this.boosting = shift && boost !== null && this.boostFuel > 0 && this.airTime > 0.1;
+    const braking = input.isDown(K.airBrake) && !this.boosting;
+    {
       const v = Math.hypot(this.airVX, this.airVZ);
-      if (lean !== 0 && v > 0.01) {
-        const base = Math.max(this.launchSpeed, 6);
-        const next = clamp(v + lean * B.airDrift * dt, Math.min(v, base * A.driftMinSpeed), Math.max(v, base * A.driftMaxSpeed));
+      const base = Math.max(this.launchSpeed, 6);
+      if (this.boosting && boost && v > 0.01) {
+        this.boostFuel = Math.max(0, this.boostFuel - dt);
+        const next = Math.max(v, Math.min(v + boost.thrust * dt, base * boost.topSpeed));
+        this.airVX *= next / v;
+        this.airVZ *= next / v;
+        // Lift: cancel part of gravity while the booster burns.
+        this.vy += A.gravity * boost.lift * dt;
+        if (!wasBoosting) this.events.push({ type: 'boost' });
+      } else if (braking && v > 0.01) {
+        // S: air brake, to drop short.
+        const next = Math.max(Math.min(v, base * A.driftMinSpeed), v - B.airDrift * dt);
         this.airVX *= next / v;
         this.airVZ *= next / v;
       }
     }
 
     // Flying out the back: ease off a flight that would sail past the next wave, so it lands on the face.
-    if (this.seaward && !shift && A.hopAssist * B.guide > 0 && this.airVZ < 0) {
+    if (this.seaward && !this.boosting && !braking && A.hopAssist * B.guide > 0 && this.airVZ < 0) {
       let next: Wave | null = null;
       for (const cand of this.waves.waves) {
         if (cand === this.launchWave || cand.crestZ > this.pos.z + 2 || cand.amp < 1.5) continue;
@@ -813,8 +846,8 @@ export class Surfer {
     this.pos.z += (this.airVZ + this.airFrame) * dt;
 
     // Tricks: Q/E spin, W/S flip. Let go and the board levels itself out.
-    const spinIn = input.axis('KeyE', 'KeyQ');
-    const flipIn = shift ? 0 : input.axis('KeyS', 'KeyW');
+    const spinIn = input.axis(K.spinRight, K.spinLeft);
+    const flipIn = input.axis(K.flipBack, K.flipForward);
     const k = 1 - Math.exp(-dt * A.rotationResponse);
     const spinTarget =
       spinIn !== 0 ? spinIn * A.spinRate : clamp(-offNearest(this.spin, Math.PI) * 5, -A.settleRate, A.settleRate);
@@ -864,6 +897,7 @@ export class Surfer {
       // For a moment the hands-off autopilot carves harder, to bend the landing into a trim line.
       this.landAssist = A.landCarveTime;
       this.landGlide = A.landGlideTime;
+      this.refillBooster();
       this.landSide = Math.abs(wx) > 1.5 ? Math.sign(wx) : ws ? Math.sign(this.pos.x - ws.wave.peakX) || 1 : 1;
       const grabbed = this.grabTime >= A.grabMinTime;
       const tricked = Math.abs(this.spin) > Math.PI * 0.75 || Math.abs(this.flip) > Math.PI * 1.5 || grabbed;

@@ -174,8 +174,9 @@ export class Hud {
         break;
       case 'air':
         hint =
-          '<b>Q E</b> spin · <b>W S</b> flip · <b>F</b> or right mouse grab · <b>A D</b> steer · <b>Space</b> air kick<br>' +
-          '<b>Shift+W</b> stretch the flight · <b>Shift+S</b> shorten it · let go to level out';
+          '<b>← →</b> spin · <b>↑ ↓</b> flip · <b>F</b> or right mouse grab · <b>A D</b> steer · <b>Space</b> air kick<br>' +
+          (surfer.boosterLevel > 0 ? '<b>Shift</b> booster · ' : '') +
+          '<b>S</b> air brake · let go of the arrows to level out';
         break;
       case 'wipeout':
         hint = 'Shake it off…';
@@ -191,15 +192,22 @@ export class Hud {
     // Air kicks: filled pips are ready, the last one shows progress.
     const whole = Math.floor(surfer.kickCharges + 1e-6);
     const part = Math.round((surfer.kickCharges - whole) * 10);
-    const key = `${whole}:${part}`;
+    const key = `${whole}:${part}:${surfer.boosterLevel}`;
     if (key !== this.lastKicks) {
       this.lastKicks = key;
-      let html = 'AIR KICK ';
+      let html = '';
+      if (surfer.boosterLevel > 0) html += 'BOOST <span class="boost"><span id="boost-fill"></span></span> ';
+      html += 'AIR KICK ';
       for (let i = 0; i < CONFIG.air.kickMaxCharges; i++) {
         const fill = i < whole ? 100 : i === whole ? part * 10 : 0;
         html += `<span class="kick"><span style="width:${fill}%"></span></span>`;
       }
       this.kicks.innerHTML = html;
+    }
+
+    if (surfer.boosterLevel > 0) {
+      const fill = document.getElementById('boost-fill');
+      if (fill) fill.style.width = `${Math.round((surfer.boostFuel / surfer.boostSeconds) * 100)}%`;
     }
 
     if (this.bannerTimer > 0) {

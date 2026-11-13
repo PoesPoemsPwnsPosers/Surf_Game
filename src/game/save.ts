@@ -12,6 +12,8 @@ export interface SaveData {
   board: number;
   /** Health upgrades bought (0 to the number of health prices). */
   health: number;
+  /** Booster level (0 is none). */
+  booster: number;
   /** Ids of weapons owned, and the one in hand. */
   weapons: string[];
   weapon: string | null;
@@ -29,6 +31,7 @@ export function newSave(): SaveData {
     boardsOwned: CONFIG.boards.map((_, i) => i <= CONFIG.startingBoardTier),
     board: CONFIG.startingBoardTier,
     health: 0,
+    booster: 0,
     weapons: [],
     weapon: null,
     bossTicket: false,
@@ -54,6 +57,7 @@ export function loadSave(): SaveData {
       boardsOwned,
       board,
       health: Math.min(CONFIG.shop.healthPrices.length, Math.max(0, Math.round(Number(d.health) || 0))),
+      booster: Math.min(CONFIG.booster.length, Math.max(0, Math.round(Number(d.booster) || 0))),
       weapons,
       weapon: d.weapon && weapons.includes(d.weapon) ? d.weapon : (weapons[0] ?? null),
       bossTicket: d.bossTicket === true,
