@@ -99,8 +99,9 @@ export class BossView {
     const ringGeo = new THREE.RingGeometry(0.9, 1, 28);
     const discGeo = new THREE.CircleGeometry(1, 28);
     for (let i = 0; i < 6; i++) {
+      // Drawn through the water, so a wave face cannot hide part of the warning.
       const mat = (opacity: number) =>
-        new THREE.MeshBasicMaterial({ color: 0xff3b30, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide });
+        new THREE.MeshBasicMaterial({ color: 0xff3b30, transparent: true, opacity, depthWrite: false, depthTest: false, side: THREE.DoubleSide });
       const ring = new THREE.Mesh(ringGeo, mat(0.95));
       const disc = new THREE.Mesh(discGeo, mat(0.35));
       ring.rotation.x = disc.rotation.x = -Math.PI / 2;
@@ -199,16 +200,7 @@ export class BossView {
       const { ring, disc } = this.rings[i];
       ring.visible = disc.visible = s.active;
       if (!s.active) continue;
-      // Sit on the highest water under the ring, so a wave face does not swallow half of it.
-      const R = B.strikeRadius * 0.7;
-      const y =
-        Math.max(
-          this.water.height(s.x, s.z),
-          this.water.height(s.x + R, s.z),
-          this.water.height(s.x - R, s.z),
-          this.water.height(s.x, s.z + R),
-          this.water.height(s.x, s.z - R),
-        ) + 0.3;
+      const y = this.water.height(s.x, s.z) + 0.3;
       const t = 1 - Math.max(0, s.time) / s.delay;
       ring.position.set(s.x, y, s.z);
       disc.position.set(s.x, y - 0.05, s.z);
