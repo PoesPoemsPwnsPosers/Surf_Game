@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Surf Game: Venice Beach</title>
+    <link rel="stylesheet" href="/src/ui/style.css" />
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+
+    <div id="hud" class="hidden">
+      <div id="set-timer">
+        <div id="set-label">NEXT SET</div>
+        <div id="set-bar"><div id="set-fill"></div></div>
+        <div id="set-pips"></div>
+      </div>
+      <div id="boss"><div id="boss-name">THE STINGRAY</div><div id="boss-bar"><div id="boss-fill"></div></div></div>
+      <div id="score">
+        <div class="label">COOL POINTS</div>
+        <div id="score-total">0</div>
+      </div>
+      <div id="combo">
+        <div id="combo-mult">x1</div>
+        <div class="combo-body">
+          <div class="label">COMBO</div>
+          <div id="combo-pot">0</div>
+        </div>
+      </div>
+      <div id="popups"></div>
+      <div id="barrel-tag">IN THE BARREL</div>
+      <div id="banner"></div>
+      <div id="prompt"></div>
+      <div id="board"><span id="board-name"></span><div id="loadout"></div><div id="kicks"></div></div>
+      <div id="speed"><span id="speed-value">0</span><span class="unit">mph</span></div>
+      <div id="hint"></div>
+    </div>
+
+    <div id="overlay" class="overlay">
+      <div class="panel">
+        <h1 id="overlay-title">Venice Beach</h1>
+        <p id="overlay-sub">Loading…</p>
+        <button id="overlay-button" disabled>Loading…</button>
+        <p class="start-hint">or press Enter</p>
+        <div class="controls">
+          <div class="group">On land</div>
+          <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Walk. <b>Shift</b> runs, <b>Space</b> hops. Jump off the end of the pier or wade in to start paddling.</span></div>
+          <div><kbd>F</kbd><span>Open the surf shop (stand on the yellow mat on the pier). Spend cool points on boards, hearts, weapons and the boss fight.</span></div>
+          <div class="group">In the water</div>
+          <div><span class="lead">Every move adds to your combo and raises the multiplier. Ride it out cleanly to bank it. Wipe out and the combo is gone.</span></div>
+          <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Paddle. Hold <b>Shift</b> to sprint.</span></div>
+          <div><kbd>Space</kbd><span>Pop up when a wave reaches you.</span></div>
+          <div class="group">On the wave (hands off, the board trims by itself)</div>
+          <div><kbd>A</kbd><kbd>D</kbd><span>Carve. <b>Shift</b> pumps for speed, <b>W</b> leans in, <b>S</b> stalls.</span></div>
+          <div><kbd>S</kbd><span>Stall next to the whitewater to let the curling lip catch up: that is the barrel.</span></div>
+          <div><kbd>Space</kbd><span>Jump. Carve up the face with speed to launch off the lip. Aim straight out to sea over a small lip to fly out the back.</span></div>
+          <div><kbd>Q</kbd><span>Cutback.</span><kbd>E</kbd><span>Snap.</span></div>
+          <div><kbd>W</kbd>+<kbd>Q</kbd><span>Hang ten (hold).</span><kbd>S</kbd>+<kbd>Q</kbd><span>Tail slide (hold).</span></div>
+          <div><kbd>W</kbd>+<kbd>E</kbd><span>Floater (hold).</span></div>
+          <div class="group">In the air</div>
+          <div><kbd>←</kbd><kbd>→</kbd><span>Spin.</span><kbd>↑</kbd><kbd>↓</kbd><span>Flip. Let go to level out.</span></div>
+          <div><kbd>A</kbd><kbd>D</kbd><span>Steer the flight.</span><kbd>F</kbd><span>Grab (or right mouse).</span></div>
+          <div><kbd>Shift</kbd><span>Booster (from the shop): a burst of speed and lift. Refills when you touch down.</span><kbd>S</kbd><span>Air brake.</span></div>
+          <div><kbd>Space</kbd><span>Air kick for extra height and distance. Earn kicks by landing tricks and riding fast.</span></div>
+          <div class="group">The Stingray (buy the fight and a weapon at the shop)</div>
+          <div><kbd>Mouse</kbd><span>Hold the left button while riding or in the air to shoot. Shots aim themselves and hit harder from the air. Stay out of the red rings, or be airborne when they land.</span></div>
+          <div class="group">Other</div>
+          <div><kbd>Esc</kbd><span>Pause.</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="shop" class="overlay hidden">
+      <div class="panel shop-panel">
+        <div class="shop-head">
+          <h1>Surf Shop</h1>
+          <div class="shop-wallet"><span class="label">COOL POINTS</span><span id="shop-points">0</span></div>
+        </div>
+        <div id="shop-list"></div>
+        <div class="shop-foot">
+          <button id="shop-close">Back to the pier</button>
+          <button id="shop-reset" class="quiet">Reset progress</button>
+        </div>
+        <p id="shop-note" class="start-hint"></p>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
