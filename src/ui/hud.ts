@@ -112,8 +112,9 @@ export class Hud {
 
   /**
    * @param action a prompt for something the player can do right here (for example open the shop), or ''
+   * @param touch true when the game is being played with the on-screen controls
    */
-  update(dt: number, surfer: Surfer, waves: WaveSystem, score: Score, action = ''): void {
+  update(dt: number, surfer: Surfer, waves: WaveSystem, score: Score, action = '', touch = false): void {
     // Cool points: the banked total counts up to its new value.
     const gap = score.total - this.shownTotal;
     this.shownTotal = Math.abs(gap) < 1 ? score.total : this.shownTotal + gap * Math.min(1, dt * 6);
@@ -165,7 +166,7 @@ export class Hud {
       go = true;
     } else if (surfer.state === 'paddle') {
       if (surfer.canPopUp) {
-        prompt = 'SPACE: POP UP!';
+        prompt = touch ? 'POP UP!' : 'SPACE: POP UP!';
         go = true;
       } else if (surfer.waveIncoming) {
         prompt = 'Wave coming. Get ready…';

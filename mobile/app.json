@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "Surf Game",
+    "slug": "surf-game",
+    "version": "1.0.0",
+    "orientation": "landscape",
+    "icon": "./assets/icon.png",
+    "ios": {
+      "supportsTablet": true,
+      "requireFullScreen": true,
+      "bundleIdentifier": "com.poespoemspwnsposers.surfgame"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#8fd3ff",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.poespoemspwnsposers.surfgame"
+    },
+    "plugins": [
+      [
+        "expo-screen-orientation",
+        {
+          "initialOrientation": "LANDSCAPE"
+        }
+      ]
+    ]
+  }
+}

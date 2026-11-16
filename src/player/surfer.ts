@@ -778,12 +778,13 @@ export class Surfer {
     const K = CONFIG.keys;
     const boost = this.boosterLevel > 0 ? CONFIG.booster[this.boosterLevel - 1] : null;
     const wasBoosting = this.boosting;
-    this.boosting = shift && boost !== null && this.boostFuel > 0 && this.airTime > 0.1;
+    const v = Math.hypot(this.airVX, this.airVZ);
+    // The booster pushes along the flight, so it needs a flight direction to push along.
+    this.boosting = shift && boost !== null && this.boostFuel > 0 && this.airTime > 0.1 && v > 0.01;
     const braking = input.isDown(K.airBrake) && !this.boosting;
     {
-      const v = Math.hypot(this.airVX, this.airVZ);
       const base = Math.max(this.launchSpeed, 6);
-      if (this.boosting && boost && v > 0.01) {
+      if (this.boosting && boost) {
         this.boostFuel = Math.max(0, this.boostFuel - dt);
         const next = Math.max(v, Math.min(v + boost.thrust * dt, base * boost.topSpeed));
         this.airVX *= next / v;

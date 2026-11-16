@@ -25,6 +25,7 @@ Other commands: `npm run build` (type check and production build), `npm run type
 | 3. Venice Beach world, walking, shop, saving | Built and playtested |
 | 3.5. Air update: tricks on the arrow keys, booster, faster drop-ins | **Built. Waiting for playtest.** |
 | 4. Stingray boss | **Built. Waiting for playtest.** |
+| Mobile: touch controls, Expo app, GitHub Pages | **Built. Not yet played on a real phone.** |
 | 5. Polish: sound, title and controls screens, performance | Not started |
 
 ## What is built (milestone 1)
@@ -301,6 +302,69 @@ drawing in `src/fx/bossView.ts`.
   Dodging by carving or jumping was not driven by a script, and no person has played the fight yet, so the
   difficulty is a first guess.
 
+## Mobile, touch controls and the web deploy
+
+Three things, all running the same game code.
+
+**1. Touch controls in the web game** (`src/ui/touchControls.ts`, numbers in `touch` in
+`src/config.ts`). They switch on by themselves on a phone or tablet, or with `?touch=1` on the
+address. The game is played with the phone held sideways; held upright it asks for a turn and pauses.
+
+| Control | Where | What it does |
+| --- | --- | --- |
+| Stick | Bottom left | Walk, paddle, carve, steer in the air. It presses W A S D for you |
+| Drag on the view | Anywhere else | Look around |
+| II | Top right | Pause |
+| HOP / POP UP / JUMP / KICK | Bottom right | The Space key: one button, named for what it does right now |
+| RUN / SPRINT / PUMP / BOOST | Next to it | The Shift key. BOOST only shows when a booster is owned |
+| CUT, SNAP | On a wave | Q and E. Stick up + CUT is hang ten, stick down + CUT is tail slide, stick up + SNAP is floater |
+| SPIN left and right, FRONT FLIP, BACK FLIP, GRAB | In the air | The arrow keys and F |
+| SHOP | On the yellow mat | Opens the shop |
+| SHOOT | During the boss fight, while riding | Hold to fire |
+
+Only the buttons that do something in the current state are shown. Every button maps to the
+same key the keyboard uses, so the game rules are untouched. The game also pauses when the tab
+or app goes to the background.
+
+**2. The mobile app** (`mobile/`, Expo SDK 58). A full-screen web view around a single-file
+build of the game (`npm run build:mobile` makes it). Works offline. Locked to landscape, keeps
+the screen awake, pauses when the app leaves the screen, and the Android back button pauses.
+See `mobile/README.md` for how to run it on a phone with Expo Go and how to build it.
+This is a wrapper, not a rewrite in native graphics: the HUD, shop and menus are web pages, so
+a web view keeps one codebase for desktop, phone browser and app.
+
+**3. GitHub Pages** (`.github/workflows/pages.yml`). Every push to `main` runs the tests and,
+if they pass, publishes the web build. One-time setup: in the repository, Settings > Pages >
+Source: "GitHub Actions". The address is `https://poespoemspwnsposers.github.io/Surf_Game/`.
+
+### Tests
+
+`npm test` builds the game and plays it in a real browser (Playwright), three ways:
+
+- **desktop:** keyboard and mouse at 1280 x 720.
+- **phone:** the web build at phone size, played with real multi-touch input.
+- **mobile-app:** the single file the Expo app loads, at the address and with the start-up
+  script the app uses.
+
+What they cover: start-up with no errors; catching and riding a wave; wave and air tricks;
+banking and saving points; the shop, buying, and the save surviving a reload; winning and
+losing the boss fight; wipeouts; coming ashore; the stick in all eight directions; every button
+pressing and releasing its key; four fingers at once; a whole wave played by touch; camera
+drag; pause and resume; nothing left held after a pause or when a button disappears; the
+upright-phone screen; and that no control or readout overlaps another or leaves the screen on
+five screen sizes from a small phone to a tablet.
+
+**Not tested, and worth knowing:**
+
+- **No real phone has run this.** The tests use Chromium at phone size with touch input. That
+  is the same engine as Android's browser and web view. iPhone Safari and the iOS web view are
+  a different engine and were not run at all.
+- **The native app was type-checked, bundled for Android and iOS, and its native project
+  generated**, but not compiled or installed: there is no Android SDK, Xcode or phone here.
+- **Frame rate on a phone is unknown.**
+- **Whether the buttons feel right under real thumbs** (size, spacing, the stick's dead zone)
+  is a first guess.
+
 ## Controls (final layout so far)
 
 On land: WASD walk, Shift run, Space hop, F opens the shop from the yellow mat on the pier.
@@ -371,6 +435,10 @@ src/
   fx/bossView.ts          draws the Stingray, the shots and the warning rings
   ui/hud.ts, style.css    on-screen display
   ui/shopPanel.ts         the shop screen
+  ui/touchControls.ts     on-screen stick and buttons for phones and tablets
+scripts/build-mobile.mjs  builds the game as one HTML file for the mobile app
+mobile/                   the Expo app (iOS and Android)
+tests/                    automated playtests (npm test)
 ```
 
 Adding a beach: create `src/levels/<name>/index.ts` that default-exports a `LevelDefinition`
