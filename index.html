@@ -2,7 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="theme-color" content="#8fd3ff" />
     <title>Surf Game: Venice Beach</title>
     <link rel="stylesheet" href="/src/ui/style.css" />
   </head>
@@ -41,8 +44,8 @@
         <h1 id="overlay-title">Venice Beach</h1>
         <p id="overlay-sub">Loading…</p>
         <button id="overlay-button" disabled>Loading…</button>
-        <p class="start-hint">or press Enter</p>
-        <div class="controls">
+        <p class="start-hint keys-only">or press Enter</p>
+        <div class="controls keys-only">
           <div class="group">On land</div>
           <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Walk. <b>Shift</b> runs, <b>Space</b> hops. Jump off the end of the pier or wade in to start paddling.</span></div>
           <div><kbd>F</kbd><span>Open the surf shop (stand on the yellow mat on the pier). Spend cool points on boards, hearts, weapons and the boss fight.</span></div>
@@ -67,6 +70,30 @@
           <div class="group">Other</div>
           <div><kbd>Esc</kbd><span>Pause.</span></div>
         </div>
+        <div class="controls touch-only">
+          <div class="group">Everywhere</div>
+          <div><kbd>Stick</kbd><span>Bottom left. Walk, paddle, carve and steer with it.</span></div>
+          <div><kbd>Drag</kbd><span>Drag a finger across the view to look around.</span></div>
+          <div><kbd>II</kbd><span>Top right. Pause.</span></div>
+          <div class="group">On land</div>
+          <div><kbd>RUN</kbd><kbd>HOP</kbd><span>Jump off the end of the pier or wade in to start paddling.</span></div>
+          <div><kbd>SHOP</kbd><span>Shows up on the yellow mat on the pier. Spend cool points on boards, boosters, hearts, weapons and the boss fight.</span></div>
+          <div class="group">In the water</div>
+          <div><span class="lead">Every move adds to your combo and raises the multiplier. Ride it out cleanly to bank it. Wipe out and the combo is gone.</span></div>
+          <div><kbd>SPRINT</kbd><span>Paddle faster.</span><kbd>POP UP</kbd><span>When a wave reaches you.</span></div>
+          <div class="group">On the wave (hands off, the board trims by itself)</div>
+          <div><kbd>Stick</kbd><span>Left and right carve. Up leans in, down stalls: stall next to the whitewater for the barrel.</span></div>
+          <div><kbd>PUMP</kbd><span>Hold for speed.</span><kbd>JUMP</kbd><span>Carve up the face with speed to launch.</span></div>
+          <div><kbd>CUT</kbd><span>Cutback. With the stick up: hang ten. Stick down: tail slide.</span></div>
+          <div><kbd>SNAP</kbd><span>Snap. With the stick up: floater.</span></div>
+          <div class="group">In the air</div>
+          <div><kbd>SPIN</kbd><kbd>FLIP</kbd><span>Hold to spin and flip. Let go to level out before you land.</span></div>
+          <div><kbd>GRAB</kbd><span>Hold.</span><kbd>KICK</kbd><span>Extra height, when you have a charge.</span></div>
+          <div><kbd>BOOST</kbd><span>With a booster from the shop. Refills when you touch down.</span></div>
+          <div><kbd>Stick</kbd><span>Left and right steer the flight. Down is the air brake.</span></div>
+          <div class="group">The Stingray</div>
+          <div><kbd>SHOOT</kbd><span>Hold while riding or in the air. Shots aim themselves. Stay out of the red rings, or be airborne when they land.</span></div>
+        </div>
       </div>
     </div>
 
@@ -84,6 +111,8 @@
         <p id="shop-note" class="start-hint"></p>
       </div>
     </div>
+
+    <div id="rotate"><div><b>Turn your phone sideways</b><br />Venice Beach is played in landscape.</div></div>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

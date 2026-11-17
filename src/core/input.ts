@@ -74,6 +74,12 @@ export class Input {
     }
   }
 
+  /** Turn the view by this many pixels of drag (used by the touch controls). */
+  addLook(dx: number, dy: number): void {
+    this.mouseDX += dx;
+    this.mouseDY += dy;
+  }
+
   /** Call once at the end of each frame. */
   endFrame(): void {
     this.mouseDX = 0;

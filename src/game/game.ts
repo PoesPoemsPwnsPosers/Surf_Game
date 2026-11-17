@@ -12,6 +12,7 @@ import { WaveSystem } from '../ocean/waves';
 import { Surfer, type SurferEvent } from '../player/surfer';
 import { Hud } from '../ui/hud';
 import { ShopPanel } from '../ui/shopPanel';
+import { TouchControls } from '../ui/touchControls';
 import { BossFight, type BossEvent } from './boss';
 import { clearSave, loadSave, newSave, writeSave, type SaveData } from './save';
 import { Score } from './score';
@@ -31,6 +32,7 @@ export class Game {
   private cam: FollowCamera;
   private hud!: Hud;
   private shopPanel!: ShopPanel;
+  private touch: TouchControls;
   private waves!: WaveSystem;
   private ocean!: OceanMesh;
   private lip!: LipMesh;
@@ -57,6 +59,7 @@ export class Game {
     this.renderer.toneMapping = THREE.NoToneMapping;
     this.input = new Input(canvas);
     this.cam = new FollowCamera(window.innerWidth / window.innerHeight);
+    this.touch = new TouchControls(this.input, canvas, () => this.togglePause());
     this.score.total = this.save.points;
     this.score.best = this.save.best;
 
@@ -64,6 +67,8 @@ export class Game {
       this.renderer.setSize(window.innerWidth, window.innerHeight, false);
       this.cam.camera.aspect = window.innerWidth / window.innerHeight;
       this.cam.camera.updateProjectionMatrix();
+      // The touch layout is for a phone held sideways: turning it upright pauses the game.
+      if (this.touch.enabled && window.innerHeight > window.innerWidth) this.pause();
     });
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Escape') {
@@ -80,11 +85,39 @@ export class Game {
     canvas.addEventListener('click', () => {
       if (this.mode === 'playing') this.lock();
     });
+    // A phone call, a switched tab or the app going to the background pauses the game.
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.pause();
+    });
+  }
+
+  /** Pause from outside the page: the mobile app calls this when it goes to the background. */
+  pauseFromHost(): void {
+    this.pause();
   }
 
   private lock(): void {
+    // Touch screens have no pointer to lock: a finger drag turns the view instead.
+    if (this.touch.enabled) {
+      this.goFullscreen();
+      return;
+    }
     this.wantLock = true;
     this.input.lockPointer();
+  }
+
+  /** On a phone browser, fill the screen and hold it sideways where the browser allows it. */
+  private goFullscreen(): void {
+    const root = document.documentElement;
+    // Inside the mobile app the view already fills the screen.
+    if ((window as unknown as { __SURF_NATIVE?: boolean }).__SURF_NATIVE) return;
+    if (document.fullscreenElement || typeof root.requestFullscreen !== 'function') return;
+    root
+      .requestFullscreen({ navigationUI: 'hide' })
+      .then(() => (screen.orientation as unknown as { lock?: (o: string) => Promise<void> }).lock?.('landscape'))
+      .catch(() => {
+        /* Not allowed here (iPhone Safari, an embedded view). The game still plays. */
+      });
   }
 
   async start(levelId: LevelId): Promise<void> {
@@ -340,7 +373,16 @@ export class Game {
     this.bossView.update(live, this.fight, this.surfer.pos.x, this.surfer.pos.y, this.surfer.pos.z);
     if (this.mode !== 'loading') {
       this.hud.setBoss(this.fight.active ? this.fight.hp / this.fight.maxHp : -1, this.fight.phase);
-      this.hud.update(dt, this.surfer, this.waves, this.score, playing && this.atShop() ? 'F: SURF SHOP' : '');
+      const atShop = playing && this.atShop();
+      const shopPrompt = this.touch.enabled ? 'SURF SHOP: tap SHOP' : 'F: SURF SHOP';
+      this.hud.update(dt, this.surfer, this.waves, this.score, atShop ? shopPrompt : '', this.touch.enabled);
+      this.touch.update({
+        playing,
+        state: this.surfer.state,
+        fighting: this.fight.active,
+        atShop,
+        hasBooster: this.surfer.boosterLevel > 0,
+      });
     }
     this.renderer.render(this.scene, this.cam.camera);
     this.input.endFrame();
@@ -379,6 +421,7 @@ export class Game {
       cam: this.cam,
       ocean: this.ocean,
       lip: this.lip,
+      touch: this.touch,
       fight: this.fight,
       startFight: () => this.startFight(),
     };

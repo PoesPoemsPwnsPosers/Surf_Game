@@ -6,7 +6,7 @@
   font-family: 'Trebuchet MS', 'Avenir Next', 'Segoe UI', sans-serif;
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; overflow: hidden; background: #8fd3ff; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #8fd3ff; overscroll-behavior: none; }
 #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 .hidden { display: none !important; }
 
@@ -138,3 +138,96 @@ button.quiet { background: transparent; color: var(--ink); box-shadow: none; fon
 #boss.angry #boss-fill { background: var(--coral); }
 #boss.angry #boss-name { color: var(--coral); }
 #loadout .heart.lost { opacity: 0.3; }
+
+/* ---------------------------------------------------------------- Touch (phones and tablets) */
+.touch-only { display: none !important; }
+body.touch .touch-only { display: grid !important; }
+body.touch .keys-only { display: none !important; }
+body.touch { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+body.touch #game { touch-action: none; }
+body.touch .panel { touch-action: pan-y; -webkit-overflow-scrolling: touch; }
+/* The key hints are for a keyboard; the buttons carry their own labels. */
+body.touch #hint { display: none; }
+
+#touch {
+  position: fixed; inset: 0; pointer-events: none; touch-action: none; user-select: none; -webkit-user-select: none;
+  --size: 64px; --gap: 10px;
+  --left: calc(18px + env(safe-area-inset-left, 0px));
+  --right: calc(16px + env(safe-area-inset-right, 0px));
+  --bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+}
+#touch-stick {
+  position: absolute; left: var(--left); bottom: var(--bottom); width: 132px; height: 132px; border-radius: 50%;
+  background: rgba(13, 43, 69, 0.28); border: 2px solid rgba(255, 255, 255, 0.55); pointer-events: auto; touch-action: none;
+}
+#touch-stick.down { background: rgba(13, 43, 69, 0.42); }
+#touch-knob {
+  position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85); box-shadow: 0 3px 0 rgba(13, 43, 69, 0.35); pointer-events: none;
+}
+.touch-btn {
+  position: absolute;
+  right: calc(var(--right) + var(--col, 0) * (var(--size) + var(--gap)));
+  bottom: calc(var(--bottom) + var(--row, 0) * (var(--size) + var(--gap)));
+  width: var(--size); height: var(--size); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  font-weight: 900; font-size: 11px; line-height: 1.1; letter-spacing: 0.04em; color: #fff;
+  background: rgba(13, 43, 69, 0.5); border: 2px solid rgba(255, 255, 255, 0.7);
+  pointer-events: auto; touch-action: none; cursor: pointer;
+}
+.touch-btn.main { background: rgba(25, 181, 201, 0.78); font-size: 12px; }
+.touch-btn.fire { background: rgba(255, 90, 95, 0.8); }
+.touch-btn.down { background: var(--sun); color: var(--ink); transform: scale(0.94); }
+#touch-pause {
+  right: var(--right); bottom: auto; top: calc(10px + env(safe-area-inset-top, 0px));
+  width: 44px; height: 44px; font-size: 15px; letter-spacing: 0.1em;
+}
+
+/* The speed and board readouts move up out of the way of the buttons. */
+body.touch #speed { right: calc(74px + env(safe-area-inset-right, 0px)); bottom: auto; top: calc(10px + env(safe-area-inset-top, 0px)); font-size: 30px; }
+body.touch #speed .unit { font-size: 12px; }
+/* The board, hearts and kicks sit under the pause button, in a narrow column that wraps. */
+body.touch #board { right: calc(16px + env(safe-area-inset-right, 0px)); bottom: auto; top: calc(60px + env(safe-area-inset-top, 0px)); font-size: 13px; max-width: 150px; }
+body.touch #loadout { font-size: 12px; }
+body.touch #score { left: calc(18px + env(safe-area-inset-left, 0px)); }
+body.touch #combo, body.touch #popups { left: calc(18px + env(safe-area-inset-left, 0px)); }
+body.touch #prompt { bottom: auto; top: 46%; }
+
+/* Phone-sized screens held sideways: everything a size smaller. */
+@media (max-height: 520px) {
+  #set-timer { top: 8px; width: 210px; padding: 6px 12px 8px; border-radius: 12px; }
+  #set-label { font-size: 12px; }
+  #set-bar { height: 6px; margin: 5px 0; }
+  .pip { width: 20px; height: 7px; }
+  #score-total { font-size: 30px; }
+  #score { top: 8px; }
+  #combo { top: 58px; }
+  #combo-mult { font-size: 24px; }
+  #combo-pot { font-size: 19px; }
+  #popups { top: 98px; }
+  .popup { font-size: 14px; }
+  .popup.bank { font-size: 17px; }
+  #banner { font-size: 30px; top: 30%; }
+  #prompt { font-size: 20px; }
+  #prompt.go { font-size: 28px; }
+  #barrel-tag { font-size: 16px; top: 40%; }
+  #boss { top: 70px; width: min(320px, 44vw); }
+  #boss-name { font-size: 12px; }
+  #boss-bar { height: 10px; }
+  .panel { padding: 14px 18px 16px; border-radius: 16px; max-height: 94vh; }
+  .panel h1 { font-size: 28px; }
+  .controls { font-size: 13px; }
+  #touch { --size: 58px; --gap: 8px; }
+  #touch-stick { width: 118px; height: 118px; }
+}
+
+/* Held upright: ask for a turn. Only on touch devices; a narrow desktop window still plays. */
+#rotate { display: none; }
+@media (orientation: portrait) {
+  body.touch #rotate {
+    position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; text-align: center;
+    background: var(--ink); color: #fff; font-size: 18px; line-height: 1.6; padding: 24px;
+  }
+  body.touch #rotate b { font-size: 24px; color: var(--sun); }
+}
+body.touch #kicks { flex-wrap: wrap; max-width: 150px; margin-left: auto; }

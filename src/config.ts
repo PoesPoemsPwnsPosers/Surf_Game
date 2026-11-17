@@ -578,6 +578,14 @@ export const CONFIG = {
     reward: 3000,
   },
 
+  /** Touch controls (phones and tablets). */
+  touch: {
+    /** How far the stick has to be pushed before it counts, as a fraction of its reach. */
+    stickDeadzone: 0.3,
+    /** How much faster a finger drag turns the view than the same mouse movement. */
+    lookScale: 1.5,
+  },
+
   /**
    * Keys for air tricks, by KeyboardEvent.code. Spins and flips have their own keys so they
    * never clash with steering, braking or the booster.
